@@ -30,7 +30,7 @@ torch.autograd.set_detect_anomaly(True)
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--algo",
-    default="",
+    default="PPO",
     type=str,
     help="(Required) The algorithm you want to run. Must in [PPO]."
 )
@@ -39,7 +39,6 @@ parser.add_argument(
     default="default",
     type=str,
     help="The path of directory that you want to store the data to. "
-         "Default: /tmp/ierg6130_hw4/ppo/"
 )
 parser.add_argument(
     "--num-envs",
