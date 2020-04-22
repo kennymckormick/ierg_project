@@ -61,7 +61,7 @@ def make_envs(env_id="Walker2d-v3", seed=0, log_dir="data", num_envs=5,
         if 'healthy_z_range' in options:
             healthy_z_range = options.pop('healthy_z_range')
         envs = [lambda: Walker2d_wrapper(gym.make(
-            env_id, healthy_z_range=healthy_z_range, healthy_reward=0)) for i in range(num_envs)]
+            env_id, healthy_z_range=healthy_z_range, healthy_reward=0), options) for i in range(num_envs)]
         envs = SubprocVecEnv(envs) if asynchronous else DummyVecEnv(envs)
         return envs
 
