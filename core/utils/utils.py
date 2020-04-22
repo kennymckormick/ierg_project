@@ -41,7 +41,7 @@ def enlarge_shape(arr, to):
         newarr[:, :arr.shape[1]] = arr
     elif len(arr.shape) == 1:
         newarr = np.zeros(to)
-        newarr[:, :arr.shape[0]] = arr
+        newarr[:arr.shape[0]] = arr
     else:
         raise NotImplementedError
     return newarr
