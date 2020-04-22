@@ -42,20 +42,12 @@ def step_envs(cpu_actions, envs, episode_rewards, frame_stack_tensor,
             # Record the reward of the terminated episode to
             reward_recorder.append(episode_rewards[idx].copy())
 
-            # For CartPole-v0 environment, the length of episodes is not
-            # recorded.
             if "num_steps" in info[idx]:
                 length_recorder.append(info[idx]["num_steps"])
             total_episodes += 1
     masks = 1. - done.astype(np.float32)
 
-    # [TODO] Multiply the episode_rewards (a vector to record the episode
-    #  rewards of those episodes that are running in multiple concurrent
-    #  environments) with masks, in order to refresh the reward accumulating
-    #  when some episodes is terminated.
-    # Hint: Pay attention to the shape of `masks` and `episode_rewards`
     episode_rewards = episode_rewards * masks.reshape(episode_rewards.shape)
-    pass
 
     assert episode_rewards.shape == episode_rewards_old_shape
 
@@ -63,8 +55,6 @@ def step_envs(cpu_actions, envs, episode_rewards, frame_stack_tensor,
     masks = torch.from_numpy(masks).to(device).view(-1, 1)
     # frame_stack_tensor is refreshed in-place if done happen.
     frame_stack_masks = masks.view(-1, 1)
-    # If in multiple pong mode, we suppose only the first observation is used to
-    # train agent.
     frame_stack_tensor.update(obs[0] if isinstance(obs, tuple) else obs,
                               frame_stack_masks)
     return obs, reward, done, info, masks, total_episodes, total_steps, \
@@ -110,7 +100,7 @@ def summary(array, name, extra_dict=None):
     return ret
 
 
-def evaluate(trainer, eval_envs, num_episodes=10, seed=0):
+def evaluate(trainer, eval_env, num_episodes=10, seed=0):
     """This function evaluate the given policy and return the mean episode
     reward.
     :param policy: a function whose input is the observation
@@ -120,35 +110,30 @@ def evaluate(trainer, eval_envs, num_episodes=10, seed=0):
     :return: the averaged episode reward of the given policy.
     """
 
-    frame_stack_tensor = FrameStackTensor(
-        eval_envs.num_envs, eval_envs.observation_space.shape, trainer.device)
+    rewards, eplens = [], []
+    for i in range(num_episodes):
+        obs = eval_env.reset()
+        reward, num_step = 0, 0
 
-    def get_action(frame_stack_tensor):
-        obs = frame_stack_tensor.get()
-        if isinstance(obs, np.ndarray):
-            obs = torch.from_numpy(obs).to(trainer.device)
-        with torch.no_grad():
-            act = trainer.compute_action(obs, deterministic=True)[1]
-        act = act.view(-1).cpu().numpy()
-        return act
+        def policy(obs_array):
+            obs = torch.Tensor(obs_array).reshape([1, -1]).to(trainer.device)
+            act = trainer.model.pi.mu_net(obs)
+            return act.numpy().reshape([-1])
 
-    reward_recorder = []
-    episode_length_recorder = []
-    episode_rewards = np.zeros([eval_envs.num_envs, 1], dtype=np.float)
-    total_steps = 0
-    total_episodes = 0
-    eval_envs.seed(seed)
-    obs = eval_envs.reset()
-    frame_stack_tensor.update(obs)
-    while True:
-        obs, reward, done, info, masks, total_episodes, total_steps, \
-            episode_rewards = step_envs(
-                get_action(frame_stack_tensor), eval_envs, episode_rewards,
-                frame_stack_tensor, reward_recorder, episode_length_recorder,
-                total_steps, total_episodes, trainer.device)
-        if total_episodes >= num_episodes:
-            break
-    return reward_recorder, episode_length_recorder
+        action = policy(obs)
+        obs, rev, done, info = eval_env.step(action)
+        reward += rev
+        num_step = 1
+        while not done:
+            action = policy(obs)
+            obs, rev, done, info = eval_env.step(action)
+            reward += rev
+            num_step += 1
+
+        rewards.append(reward)
+        eplens.append(num_step)
+
+    return rewards, eplens
 
 
 class FrameStackTensor:

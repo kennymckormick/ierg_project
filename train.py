@@ -105,13 +105,7 @@ def train(args):
         num_envs=num_envs,
         asynchronous=True,
     )
-    eval_envs = make_envs(
-        env_id=env_id,
-        seed=seed,
-        log_dir=log_dir,
-        num_envs=num_envs,
-        asynchronous=False,
-    )
+    eval_env = gym.make(env_id)
     tournament = False
     if tournament:
         assert algo == "PPO", "Using PPO in tournament is a good idea, " \
@@ -191,16 +185,11 @@ def train(args):
         # ===== Evaluate Current Policy =====
         if iteration % config.eval_freq == 0:
             eval_timer = Timer()
-            evaluate_rewards, evaluate_lengths = evaluate(
-                trainer, eval_envs, 20)
-            evaluate_stat = summary(evaluate_rewards, "episode_reward")
-            if evaluate_lengths:
-                evaluate_stat.update(
-                    summary(evaluate_lengths, "episode_length"))
+            rewards, eplens = evaluate(
+                trainer, eval_env, 5)
+            evaluate_stat = summary(rewards, "episode_reward")
+            evaluate_stat.update(summary(eplens, "episode_length"))
             evaluate_stat.update(dict(
-                win_rate=float(
-                    sum(np.array(evaluate_rewards) >= 0) / len(
-                        evaluate_rewards)),
                 evaluate_time=eval_timer.now,
                 evaluate_iteration=iteration
             ))
