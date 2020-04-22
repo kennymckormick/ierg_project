@@ -57,7 +57,7 @@ def make_envs(env_id="CompetitivePong-v0", seed=0, log_dir="data", num_envs=5,
     """
     asynchronous = asynchronous and num_envs > 1
 
-    if env_id in ["CartPole-v0", "Walker-2d", "Humanoid-v2", "HumanoidStandup-v2"]:
+    if env_id in ["CartPole-v0", "Walker2d-v2", "Humanoid-v2", "HumanoidStandup-v2"]:
         print("Setup easy environment CartPole-v0 for testing.")
         envs = [lambda: gym.make(env_id) for i in range(num_envs)]
         envs = SubprocVecEnv(envs) if asynchronous else DummyVecEnv(envs)
