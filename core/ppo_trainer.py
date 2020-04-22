@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torch import nn
 
 from .base_trainer import BaseTrainer
 from .buffer import PPORolloutStorage
@@ -43,6 +44,8 @@ class PPOConfig:
         self.USE_GAE = True
         self.gae_lambda = 0.95
         self.value_loss_weight = 1.0
+        self.hidden_sizes = (64, 64)
+        self.activation = nn.Tanh
 
 
 ppo_config = PPOConfig()

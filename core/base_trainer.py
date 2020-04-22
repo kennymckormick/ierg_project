@@ -28,11 +28,11 @@ class BaseTrainer:
         self.grad_norm_max = config.grad_norm_max
         self.eps = 1e-6
 
-        num_feats = env.observation_space.shape
+        num_feats = env.observation_space.shape[0]
         self.num_actions = env.action_space.n
-        self.num_feats = (num_feats[0], *num_feats[1:])
 
-        self.model = MLPActorCritic(num_feats[0], self.num_actions)
+        self.model = MLPActorCritic(
+            num_feats, self.num_actions, hidden_sizes=config.hidden_sizes, activation=config.activation)
         self.model = self.model.to(self.device)
         self.model.train()
 
