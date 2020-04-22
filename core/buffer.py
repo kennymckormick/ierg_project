@@ -15,7 +15,7 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 
 class A2CRolloutStorage:
-    def __init__(self, num_steps, num_processes, obs_dim, device):
+    def __init__(self, num_steps, num_processes, obs_dim, act_dim, device):
         def zeros(*shapes):
             return torch.zeros(*shapes).to(device)
 
@@ -24,7 +24,7 @@ class A2CRolloutStorage:
         self.value_preds = zeros(num_steps + 1, num_processes, 1)
         self.returns = zeros(num_steps + 1, num_processes, 1)
         self.action_log_probs = zeros(num_steps, num_processes, 1)
-        self.actions = zeros(num_steps, num_processes, 1).to(torch.long)
+        self.actions = zeros(num_steps, num_processes, act_dim)
         self.masks = torch.ones(num_steps + 1, num_processes, 1).to(device)
 
         self.num_steps = num_steps
@@ -47,15 +47,6 @@ class A2CRolloutStorage:
     def compute_returns(self, next_value, gamma):
         self.returns[-1] = next_value
         for step in reversed(range(self.rewards.size(0))):
-            # [TODO] Compute the expected return of current timestep `step`
-            # Hint:
-            #  1. self.returns[step] is the expected return at timestep `step`
-            #  2. You need to use self.masks to help you remove bootstrapping
-            #   when the t=`step` state is the terminal state, at which time
-            #   the mask is 0 and otherwise 1.
-            #  3. self.rewards stores the rewards at each timestep.
-
-            # self.returns[step] = None
             self.returns[step] = self.rewards[step] + gamma * \
                 self.returns[step + 1] * self.masks[step]
             pass

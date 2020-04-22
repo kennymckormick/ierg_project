@@ -158,7 +158,7 @@ def train(args):
                 values, actions, action_log_prob = trainer.model.step(
                     frame_stack_tensor.get(), eval=True)
 
-                cpu_actions = actions.view(-1).cpu().numpy()
+                cpu_actions = actions.cpu().numpy()
 
                 obs, reward, done, info, masks, total_episodes, \
                     total_steps, episode_rewards = step_envs(
@@ -171,7 +171,7 @@ def train(args):
 
                 # Store samples
                 trainer.rollouts.insert(
-                    frame_stack_tensor.get(), actions.view(-1, 1),
+                    frame_stack_tensor.get(), actions,
                     action_log_prob, values, rewards, masks)
 
         # ===== Process Samples =====

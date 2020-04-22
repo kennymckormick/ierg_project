@@ -64,7 +64,8 @@ class BaseTrainer:
 
         values, actions, action_log_probs = self.model.step(obs, eval=False)
 
-        return values.view(-1, 1), actions.view(-1, 1), action_log_probs.view(
+        # action is n_dim, should not be squeezed
+        return values.view(-1, 1), actions, action_log_probs.view(
             -1, 1)
 
     def evaluate_actions(self, obs, act):
