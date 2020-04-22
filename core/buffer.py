@@ -53,9 +53,9 @@ class A2CRolloutStorage:
 
 
 class PPORolloutStorage(A2CRolloutStorage):
-    def __init__(self, num_steps, num_processes, obs_dim, device,
+    def __init__(self, num_steps, num_processes, obs_dim, act_dim, device,
                  use_gae=True, gae_lambda=0.95):
-        super().__init__(num_steps, num_processes, obs_dim, device)
+        super().__init__(num_steps, num_processes, obs_dim, act_dim, device)
         self.gae = use_gae
         self.gae_lambda = gae_lambda
 
