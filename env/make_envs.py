@@ -39,23 +39,11 @@ such error. We return envs = None now.
 """
 
 
-def make_envs(env_id="CompetitivePong-v0", seed=0, log_dir="data", num_envs=5,
+def make_envs(env_id="Walker2d-v2", seed=0, log_dir="data", num_envs=5,
               asynchronous=True):
-    """
-    Create CUHKPong-v0, CUHKPongDouble-v0 or CartPole-v0 environments. If
-    num_envs > 1, put them into different processes.
-    :param env_id: The name of environment you want to create
-    :param seed: The random seed
-    :param log_dir: The path to store the learning stats
-    :param num_envs: How many environments you want to run concurrently (Too
-        large number will block your program.)
-    :param asynchronous: whether to use multiprocessing
-    :return: A vectorized environment
-    """
     asynchronous = asynchronous and num_envs > 1
 
-    if env_id in ["CartPole-v0", "Walker2d-v2", "Humanoid-v2", "HumanoidStandup-v2"]:
-        print("Setup easy environment CartPole-v0 for testing.")
+    if env_id in ["Walker2d-v2", "Humanoid-v2", "HumanoidStandup-v2"]:
         envs = [lambda: gym.make(env_id) for i in range(num_envs)]
         envs = SubprocVecEnv(envs) if asynchronous else DummyVecEnv(envs)
         return envs

@@ -23,16 +23,23 @@ class BaseTrainer:
         self.lr = config.LR
         self.num_envs = config.num_envs
         self.value_loss_weight = config.value_loss_weight
-        self.entropy_loss_weight = config.entropy_loss_weight
         self.num_steps = config.num_steps
         self.grad_norm_max = config.grad_norm_max
         self.eps = 1e-6
 
-        num_feats = env.observation_space.shape[0]
-        self.num_actions = env.action_space.n
+        self.num_obs = env.observation_space.shape[0]
+        self.num_act = env.action_space.shape[0]
+        self.act_high = env.action_space.high
+        self.act_low = env.action_space.low
+
+        assert sum(self.act_high == self.act_high[0]) == self.num_act
+        assert sum(self.act_low == self.act_low[0]) == self.num_act
+        assert self.act_high[0] == -self.act_low[0]
+        self.act_coeff = self.act_high[0]
 
         self.model = MLPActorCritic(
-            num_feats, self.num_actions, hidden_sizes=config.hidden_sizes, activation=config.activation)
+            num_feats, self.num_actions, hidden_sizes=config.hidden_sizes, activation=config.activation,
+            act_coeff=self.act_coeff)
         self.model = self.model.to(self.device)
         self.model.train()
 
