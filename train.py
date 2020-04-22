@@ -36,7 +36,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--log-dir",
-    default="/tmp/ierg6130_hw4/",
+    default="default",
     type=str,
     help="The path of directory that you want to store the data to. "
          "Default: /tmp/ierg6130_hw4/ppo/"
@@ -93,7 +93,7 @@ def train(args):
     torch.set_num_threads(1)
 
     # Clean log directory
-    log_dir = verify_log_dir(args.log_dir, algo)
+    log_dir = verify_log_dir('work_dirs', args.log_dir)
 
     # Create vectorized environments
     num_envs = args.num_envs
