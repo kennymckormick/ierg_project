@@ -78,15 +78,12 @@ class MLPCritic(nn.Module):
 
 class MLPActorCritic(nn.Module):
 
-    def __init__(self, observation_space, action_space,
+    def __init__(self, obs_dim, act_dim,
                  hidden_sizes=(64, 64), activation=nn.Tanh, act_coeff=1.0):
         super().__init__()
-
-        obs_dim = observation_space.shape[0]
-
         # policy builder depends on action space
         self.pi = MLPGaussianActor(
-            obs_dim, action_space.shape[0], hidden_sizes, activation, act_coeff)
+            obs_dim, act_dim, hidden_sizes, activation, act_coeff)
 
         # build value function
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
