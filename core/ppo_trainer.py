@@ -10,7 +10,6 @@ Instructor: Professor ZHOU Bolei. Assignment author: PENG Zhenghao.
 """
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from torch import nn
 
@@ -26,7 +25,7 @@ class PPOConfig:
         # Common
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
-        self.eval_freq = 100
+        self.eval_freq = 10
         self.save_freq = 200
         self.log_freq = 10
         self.num_envs = 1

@@ -186,7 +186,7 @@ def train(args):
         if iteration % config.eval_freq == 0:
             eval_timer = Timer()
             rewards, eplens = evaluate(
-                trainer, eval_env, 5)
+                trainer, eval_env, 1)
             evaluate_stat = summary(rewards, "episode_reward")
             evaluate_stat.update(summary(eplens, "episode_length"))
             evaluate_stat.update(dict(
