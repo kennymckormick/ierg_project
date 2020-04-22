@@ -79,14 +79,18 @@ class MLPCritic(nn.Module):
 class MLPActorCritic(nn.Module):
 
     def __init__(self, obs_dim, act_dim,
-                 hidden_sizes=(64, 64), activation=nn.Tanh, act_coeff=1.0):
+                 hidden_sizes=(64, 64), activation=nn.Tanh, act_coeff=1.0, pretrain_pth=None):
         super().__init__()
         # policy builder depends on action space
         self.pi = MLPGaussianActor(
             obs_dim, act_dim, hidden_sizes, activation, act_coeff)
 
-        # build value function
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
+        if pretrain_pth is not None:
+            wt = torch.load(pretrain_pth)
+            if 'model' in wt:
+                wt = wt['model']
+            self.load_state_dict(wt)
 
     def step(self, obs, eval=True, deterministic=False):
         if eval:

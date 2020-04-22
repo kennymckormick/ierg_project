@@ -38,6 +38,10 @@ class BaseTrainer:
         if hasattr(config, 'real_act_dim'):
             self.real_act_dim = config.real_act_dim
 
+        self.pretrain_pth = None
+        if hasattr(config, 'pretrain_pth'):
+            self.pretrain_pth = config.pretrain_pth
+
         assert sum(self.act_high == self.act_high[0]) == self.act_dim
         assert sum(self.act_low == self.act_low[0]) == self.act_dim
         assert self.act_high[0] == -self.act_low[0]
@@ -45,7 +49,7 @@ class BaseTrainer:
 
         self.model = MLPActorCritic(
             self.real_obs_dim, self.real_act_dim, hidden_sizes=config.hidden_sizes,
-            activation=config.activation, act_coeff=self.act_coeff)
+            activation=config.activation, act_coeff=self.act_coeff, pretrain_pth=self.pretrain_pth)
         self.model = self.model.to(self.device)
         self.model.train()
 
