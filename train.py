@@ -24,6 +24,7 @@ from env import make_envs
 from core.ppo_trainer import PPOTrainer, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
     summary, save_progress, FrameStackTensor, step_envs, reduce_shape, enlarge_shape
+from env.make_envs import Walker2d_wrapper
 
 gym.logger.set_level(40)
 torch.autograd.set_detect_anomaly(True)
@@ -128,7 +129,17 @@ def train(args):
         asynchronous=True,
         options=env_options,
     )
-    eval_env = gym.make(env_id)
+
+    if env_id == "Walker2d-v3":
+        healthy_z_range = (0.8, 2.0)
+    elif env_id == 'Humanoid-v3':
+        healthy_z_range = (1.0, 2.0)
+    if 'healthy_z_range' in env_options:
+        healthy_z_range = env_options['healthy_z_range']
+    eval_env = gym.make(
+        env_id, healthy_z_range=healthy_z_range, healthy_reward=0)
+    if env_id == "Walker2d-v3":
+        eval_env = Walker2d_wrapper(env, env_options)
 
     obs_dim = envs.observation_space.shape[0]
     act_dim = envs.action_space.shape[0]
