@@ -39,11 +39,40 @@ such error. We return envs = None now.
 """
 
 
-def make_envs(env_id="Walker2d-v2", seed=0, log_dir="data", num_envs=5,
-              asynchronous=True):
+class Walker2d_wrapper(gym.Wrapper):
+    # options should be a list
+    def __init__(self, env, options={}):
+        super(Walker2d_wrapper, self).__init__(env)
+        self.options = options
+
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        if 'reward_threshold' in self.options:
+            reward = (reward >= self.options['reward_threshold'])
+        return observation, reward, done, info
+
+
+def make_envs(env_id="Walker2d-v3", seed=0, log_dir="data", num_envs=5,
+              asynchronous=True, options={}):
     asynchronous = asynchronous and num_envs > 1
 
-    if env_id in ["Walker2d-v2", "Humanoid-v2", "HumanoidStandup-v2"]:
-        envs = [lambda: gym.make(env_id) for i in range(num_envs)]
+    if env_id == "Walker2d-v3":
+        healthy_z_range = (0.8, 2.0)
+        if 'healthy_z_range' in options:
+            healthy_z_range = options.pop('healthy_z_range')
+        envs = [lambda: gym.make(
+            env_id, healthy_z_range=healthy_z_range, healthy_reward=0) for i in range(num_envs)]
+        envs = [Walker2d_wrapper(env) for env in envs]
         envs = SubprocVecEnv(envs) if asynchronous else DummyVecEnv(envs)
         return envs
+
+    if env_id == 'Humanoid-v3':
+        healthy_z_range = (1.0, 2.0)
+        if 'healthy_z_range' in options:
+            healthy_z_range = options.pop('healthy_z_range')
+        envs = [lambda: gym.make(
+            env_id, healthy_z_range=healthy_z_range, healthy_reward=0) for i in range(num_envs)]
+        envs = SubprocVecEnv(envs) if asynchronous else DummyVecEnv(envs)
+        return envs
+
+    raise NotImplementedError

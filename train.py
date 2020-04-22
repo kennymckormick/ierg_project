@@ -22,7 +22,7 @@ from env import make_envs
 
 from core.ppo_trainer import PPOTrainer, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
-    summary, save_progress, FrameStackTensor, step_envs
+    summary, save_progress, FrameStackTensor, step_envs, reduce_shape, enlarge_shape
 
 gym.logger.set_level(40)
 torch.autograd.set_detect_anomaly(True)
@@ -68,12 +68,14 @@ parser.add_argument(
 )
 parser.add_argument(
     "--env-id",
-    default="CartPole-v0",
+    default="Walker2d-v3",
     type=str,
     help="The environment id"
-         "Default: CartPole-v0"
 )
 args = parser.parse_args()
+
+env_options = {}
+trainer_options = {}
 
 
 def train(args):
@@ -84,6 +86,8 @@ def train(args):
     else:
         raise ValueError("args.algo must in [PPO]")
     config.num_envs = args.num_envs
+    for k, v in trainer_options.items():
+        setattr(config, k, v)
 
     # Seed the environments and setup torch
     seed = args.seed
@@ -104,12 +108,20 @@ def train(args):
         log_dir=log_dir,
         num_envs=num_envs,
         asynchronous=True,
+        options=env_options,
     )
     eval_env = gym.make(env_id)
-    tournament = False
-    if tournament:
-        assert algo == "PPO", "Using PPO in tournament is a good idea, " \
-                              "because of its efficiency compared to A2C."
+
+    obs_dim = envs.observation_space.shape[0]
+    act_dim = envs.action_space.shape[0]
+    real_obs_dim = obs_dim
+    real_act_dim = act_dim
+    if 'real_obs_dim' in trainer_options:
+        real_obs_dim = trainer_options['real_obs_dim']
+    if 'real_act_dim' in trainer_options:
+        real_act_dim = trainer_options['real_act_dim']
+    dim_dict = dict(obs_dim=obs_dim, act_dim=act_dim,
+                    real_obs_dim=real_obs_dim, real_act_dim=real_act_dim)
 
     # Setup trainer
     if algo == "PPO":
@@ -139,20 +151,18 @@ def train(args):
     print("Start training!")
     obs = envs.reset()
     frame_stack_tensor.update(obs)
-    trainer.rollouts.observations[0].copy_(frame_stack_tensor.get())
+    trainer.rollouts.observations[0].copy_(
+        reduce_shape(frame_stack_tensor.get(), real_obs_dim))
     while True:  # Break when total_steps exceeds maximum value
         with sample_timer:
             for index in range(config.num_steps):
-                values = None
-                actions = None
-                action_log_prob = None
-                pass
 
                 trainer.model.eval()
                 values, actions, action_log_prob = trainer.model.step(
-                    frame_stack_tensor.get(), eval=True)
+                    reduce_shape(frame_stack_tensor.get(), real_obs_dim), eval=True)
 
                 cpu_actions = actions.cpu().numpy()
+                cpu_actions = enlarge_shape(cpu_actions, act_dim)
 
                 obs, reward, done, info, masks, total_episodes, \
                     total_steps, episode_rewards = step_envs(
@@ -165,7 +175,8 @@ def train(args):
 
                 # Store samples
                 trainer.rollouts.insert(
-                    frame_stack_tensor.get(), actions,
+                    reduce_shape(frame_stack_tensor.get(),
+                                 real_obs_dim), actions,
                     action_log_prob, values, rewards, masks)
 
         # ===== Process Samples =====
@@ -186,7 +197,7 @@ def train(args):
         if iteration % config.eval_freq == 0:
             eval_timer = Timer()
             rewards, eplens = evaluate(
-                trainer, eval_env, 1)
+                trainer, eval_env, 1, dim_dict=dim_dict)
             evaluate_stat = summary(rewards, "episode_reward")
             evaluate_stat.update(summary(eplens, "episode_length"))
             evaluate_stat.update(dict(

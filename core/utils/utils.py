@@ -27,6 +27,26 @@ import yaml
 from scipy.signal import medfilt
 
 
+def reduce_shape(arr, to):
+    if len(arr.shape) == 2:
+        return arr[:, :to]
+    elif len(arr.shape) == 1:
+        return arr[:to]
+    raise NotImplementedError
+
+
+def enlarge_shape(arr, to):
+    if len(arr.shape) == 2:
+        newarr = np.zeros([arr.shape[0], to])
+        newarr[:, :arr.shape[1]] = arr
+    elif len(arr.shape) == 1:
+        newarr = np.zeros(to)
+        newarr[:, :arr.shape[0]] = arr
+    else:
+        raise NotImplementedError
+    return newarr
+
+
 def step_envs(cpu_actions, envs, episode_rewards, frame_stack_tensor,
               reward_recorder, length_recorder, total_steps, total_episodes,
               device):
@@ -100,7 +120,7 @@ def summary(array, name, extra_dict=None):
     return ret
 
 
-def evaluate(trainer, eval_env, num_episodes=10, seed=0):
+def evaluate(trainer, eval_env, num_episodes=10, seed=0, dim_dict=None):
     """This function evaluate the given policy and return the mean episode
     reward.
     :param policy: a function whose input is the observation
@@ -111,8 +131,10 @@ def evaluate(trainer, eval_env, num_episodes=10, seed=0):
     """
 
     rewards, eplens = [], []
+    assert dim_dict is not None
     for i in range(num_episodes):
         obs = eval_env.reset()
+        obs = reduce_shape(obs, dim_dict['real_obs_dim'])
         reward, num_step = 0, 0
 
         def policy(obs_array):
@@ -122,12 +144,16 @@ def evaluate(trainer, eval_env, num_episodes=10, seed=0):
             return act.cpu().numpy().reshape([-1])
 
         action = policy(obs)
+        action = enlarge_shape(action, dim_dict['act_dim'])
         obs, rev, done, info = eval_env.step(action)
+        obs = reduce_shape(obs, dim_dict['real_obs_dim'])
         reward += rev
         num_step = 1
         while not done:
             action = policy(obs)
+            action = enlarge_shape(action, dim_dict['act_dim'])
             obs, rev, done, info = eval_env.step(action)
+            obs = reduce_shape(obs, dim_dict['real_obs_dim'])
             reward += rev
             num_step += 1
 
