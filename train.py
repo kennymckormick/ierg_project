@@ -20,7 +20,6 @@ import numpy as np
 import torch
 from env import make_envs
 
-from core.a2c_trainer import A2CTrainer, a2c_config
 from core.ppo_trainer import PPOTrainer, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
     summary, save_progress, FrameStackTensor, step_envs
@@ -33,7 +32,7 @@ parser.add_argument(
     "--algo",
     default="",
     type=str,
-    help="(Required) The algorithm you want to run. Must in [PPO, A2C]."
+    help="(Required) The algorithm you want to run. Must in [PPO]."
 )
 parser.add_argument(
     "--log-dir",
@@ -82,10 +81,8 @@ def train(args):
     algo = args.algo
     if algo == "PPO":
         config = ppo_config
-    elif algo == "A2C":
-        config = a2c_config
     else:
-        raise ValueError("args.algo must in [PPO, A2C]")
+        raise ValueError("args.algo must in [PPO]")
     config.num_envs = args.num_envs
     assert args.env_id in ["CompetitivePong-v0", "CartPole-v0",
                            "CompetitivePongTournament-v0"]
@@ -126,7 +123,7 @@ def train(args):
     if algo == "PPO":
         trainer = PPOTrainer(envs, config)
     else:
-        trainer = A2CTrainer(envs, config)
+        raise NotImplementedError
 
     # Create a placeholder tensor to help stack frames in 2nd dimension
     # That is turn the observation from shape [num_envs, 1, 84, 84] to
