@@ -62,7 +62,7 @@ class MLPGaussianActor(Actor):
         return Normal(mu, std)
 
     def _log_prob_from_distribution(self, pi, act):
-        return pi.log_prob(act).sum(axis=-1)
+        return pi.log_prob(act).sum(axis=-1, keepdim=True)
 
 
 class MLPCritic(nn.Module):
@@ -88,16 +88,22 @@ class MLPActorCritic(nn.Module):
         # build value function
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
 
-    def step(self, obs, eval=True):
+    def step(self, obs, eval=True, deterministic=False):
         if eval:
             with torch.no_grad():
                 pi = self.pi._distribution(obs)
-                a = pi.sample()
+                if deterministic:
+                    a = pi.mean
+                else:
+                    a = pi.sample()
                 logp_a = self.pi._log_prob_from_distribution(pi, a)
                 v = self.v(obs)
         else:
             pi = self.pi._distribution(obs)
-            a = pi.sample()
+            if deterministic:
+                a = pi.mean
+            else:
+                a = pi.sample()
             logp_a = self.pi._log_prob_from_distribution(pi, a)
             v = self.v(obs)
         return v, a, logp_a

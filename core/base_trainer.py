@@ -58,11 +58,12 @@ class BaseTrainer:
     def update(self, rollout):
         raise NotImplementedError()
 
-    def compute_action(self, obs):
+    def compute_action(self, obs, deterministic=False):
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs).to(self.device)
 
-        values, actions, action_log_probs = self.model.step(obs, eval=False)
+        values, actions, action_log_probs = self.model.step(
+            obs, eval=False, deterministic=deterministic)
 
         # action is n_dim, should not be squeezed
         return values.view(-1, 1), actions, action_log_probs.view(
