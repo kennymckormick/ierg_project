@@ -10,13 +10,15 @@ Note that you may find this file is completely compatible for both A2C and PPO.
 of Information Engineering, The Chinese University of Hong Kong. Course
 Instructor: Professor ZHOU Bolei. Assignment author: PENG Zhenghao.
 """
+
+# Modification: Now it should deal with continuous control problems
 import argparse
 from collections import deque
 
 import gym
 import numpy as np
 import torch
-from competitive_pong import make_envs
+from env import make_envs
 
 from core.a2c_trainer import A2CTrainer, a2c_config
 from core.ppo_trainer import PPOTrainer, ppo_config
@@ -67,11 +69,10 @@ parser.add_argument(
 )
 parser.add_argument(
     "--env-id",
-    default="CompetitivePong-v0",
+    default="CartPole-v0",
     type=str,
-    help="The environment id, should be in ['CompetitivePong-v0', "
-         "'CartPole-v0', 'CompetitivePongTournament-v0']. "
-         "Default: CompetitivePong-v0"
+    help="The environment id"
+         "Default: CartPole-v0"
 )
 args = parser.parse_args()
 
@@ -108,7 +109,6 @@ def train(args):
         log_dir=log_dir,
         num_envs=num_envs,
         asynchronous=True,
-        resized_dim=config.resized_dim
     )
     eval_envs = make_envs(
         env_id=env_id,
@@ -116,26 +116,23 @@ def train(args):
         log_dir=log_dir,
         num_envs=num_envs,
         asynchronous=False,
-        resized_dim=config.resized_dim
     )
-    test = env_id == "CartPole-v0"
-    tournament = env_id == "CompetitivePongTournament-v0"
-    frame_stack = 4 if not test else 1
+    tournament = False
     if tournament:
         assert algo == "PPO", "Using PPO in tournament is a good idea, " \
                               "because of its efficiency compared to A2C."
 
     # Setup trainer
     if algo == "PPO":
-        trainer = PPOTrainer(envs, config, frame_stack, _test=test)
+        trainer = PPOTrainer(envs, config)
     else:
-        trainer = A2CTrainer(envs, config, frame_stack, _test=test)
+        trainer = A2CTrainer(envs, config)
 
     # Create a placeholder tensor to help stack frames in 2nd dimension
     # That is turn the observation from shape [num_envs, 1, 84, 84] to
     # [num_envs, 4, 84, 84].
     frame_stack_tensor = FrameStackTensor(
-        num_envs, envs.observation_space.shape, frame_stack, config.device)
+        num_envs, envs.observation_space.shape, config.device)
 
     # Setup some stats helpers
     episode_rewards = np.zeros([num_envs, 1], dtype=np.float)
@@ -155,36 +152,24 @@ def train(args):
     frame_stack_tensor.update(obs)
     trainer.rollouts.observations[0].copy_(frame_stack_tensor.get())
     while True:  # Break when total_steps exceeds maximum value
-        # ===== Sample Data =====
         with sample_timer:
             for index in range(config.num_steps):
-                # Get action
-                # [TODO] Get the action
-                # Hint:
-                #   1. Remember to disable gradient computing
-                #   2. trainer.rollouts is a storage containing all data
-                #   3. What observation is needed for trainer.compute_action?
                 values = None
                 actions = None
                 action_log_prob = None
                 pass
 
                 trainer.model.eval()
-                values, actions, action_log_prob = trainer.compute_action(
-                    frame_stack_tensor.get())
-
-                values, actions, action_log_prob = values.detach(
-                ), actions.detach(), action_log_prob.detach()
+                values, actions, action_log_prob = trainer.model.step(
+                    frame_stack_tensor.get(), eval=True)
 
                 cpu_actions = actions.view(-1).cpu().numpy()
 
-                # Step the environment
-                # (Check step_envs function, you need to implement it)
                 obs, reward, done, info, masks, total_episodes, \
                     total_steps, episode_rewards = step_envs(
                         cpu_actions, envs, episode_rewards, frame_stack_tensor,
                         reward_recorder, episode_length_recorder, total_steps,
-                        total_episodes, config.device, test)
+                        total_episodes, config.device)
 
                 rewards = torch.from_numpy(
                     reward.astype(np.float32)).view(-1, 1).to(config.device)
@@ -204,20 +189,15 @@ def train(args):
         trainer.model.train()
         # ===== Update Policy =====
         with update_timer:
-            policy_loss, value_loss, dist_entropy, total_loss = \
-                trainer.update(trainer.rollouts)
+            policy_loss, value_loss, total_loss = trainer.update(
+                trainer.rollouts)
             trainer.rollouts.after_update()
-
-        # ===== Reset opponent if in tournament mode =====
-        if tournament and iteration % config.num_steps == 0:
-            # Randomly choose one agent in each iteration
-            envs.reset_opponent()
 
         # ===== Evaluate Current Policy =====
         if iteration % config.eval_freq == 0:
             eval_timer = Timer()
             evaluate_rewards, evaluate_lengths = evaluate(
-                trainer, eval_envs, frame_stack, 20)
+                trainer, eval_envs, 20)
             evaluate_stat = summary(evaluate_rewards, "episode_reward")
             if evaluate_lengths:
                 evaluate_stat.update(
@@ -242,7 +222,6 @@ def train(args):
                 evaluate_stats=evaluate_stat,
                 learning_stats=dict(
                     policy_loss=policy_loss,
-                    entropy=dist_entropy,
                     value_loss=value_loss,
                     total_loss=total_loss
                 ),
@@ -258,9 +237,6 @@ def train(args):
                 ),
                 iteration=iteration
             )
-
-            if tournament:
-                stats["opponent"] = envs.current_agent_name
 
             progress.append(stats)
             pretty_print({

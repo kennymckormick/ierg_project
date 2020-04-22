@@ -9,7 +9,6 @@ Usages:
         num_envs=5,             # How many concurrent environments to run
         asynchronous=True,      # Whether to use asynchronous envrionments.
                                 # This can extremely accelerate the system
-        resized_dim=42          # Resized the observation to a 42x42 image
     )
 Notes:
 1. If you wish to use asynchronous environments, you should run it in python
@@ -41,7 +40,7 @@ such error. We return envs = None now.
 
 
 def make_envs(env_id="CompetitivePong-v0", seed=0, log_dir="data", num_envs=5,
-              asynchronous=True, resized_dim=42):
+              asynchronous=True):
     """
     Create CUHKPong-v0, CUHKPongDouble-v0 or CartPole-v0 environments. If
     num_envs > 1, put them into different processes.
@@ -51,8 +50,6 @@ def make_envs(env_id="CompetitivePong-v0", seed=0, log_dir="data", num_envs=5,
     :param num_envs: How many environments you want to run concurrently (Too
         large number will block your program.)
     :param asynchronous: whether to use multiprocessing
-    :param resized_dim: resize the observation to image with shape (1,
-        resized_dim, resized_dim)
     :return: A vectorized environment
     """
     asynchronous = asynchronous and num_envs > 1

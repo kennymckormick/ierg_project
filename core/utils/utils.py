@@ -29,7 +29,7 @@ from scipy.signal import medfilt
 
 def step_envs(cpu_actions, envs, episode_rewards, frame_stack_tensor,
               reward_recorder, length_recorder, total_steps, total_episodes,
-              device, test):
+              device):
     """Step the vectorized environments for one step. Process the reward
     recording and terminal states."""
     obs, reward, done, info = envs.step(cpu_actions)
@@ -62,10 +62,7 @@ def step_envs(cpu_actions, envs, episode_rewards, frame_stack_tensor,
     total_steps += obs[0].shape[0] if isinstance(obs, tuple) else obs.shape[0]
     masks = torch.from_numpy(masks).to(device).view(-1, 1)
     # frame_stack_tensor is refreshed in-place if done happen.
-    if test:
-        frame_stack_masks = masks.view(-1, 1)
-    else:
-        frame_stack_masks = masks.view(-1, 1, 1, 1)
+    frame_stack_masks = masks.view(-1, 1)
     # If in multiple pong mode, we suppose only the first observation is used to
     # train agent.
     frame_stack_tensor.update(obs[0] if isinstance(obs, tuple) else obs,
@@ -113,7 +110,7 @@ def summary(array, name, extra_dict=None):
     return ret
 
 
-def evaluate(trainer, eval_envs, frame_stack, num_episodes=10, seed=0):
+def evaluate(trainer, eval_envs, num_episodes=10, seed=0):
     """This function evaluate the given policy and return the mean episode
     reward.
     :param policy: a function whose input is the observation
@@ -124,9 +121,7 @@ def evaluate(trainer, eval_envs, frame_stack, num_episodes=10, seed=0):
     """
 
     frame_stack_tensor = FrameStackTensor(
-        eval_envs.num_envs, eval_envs.observation_space.shape, frame_stack,
-        trainer.device
-    )
+        eval_envs.num_envs, eval_envs.observation_space.shape, trainer.device)
 
     def get_action(frame_stack_tensor):
         obs = frame_stack_tensor.get()
@@ -150,16 +145,16 @@ def evaluate(trainer, eval_envs, frame_stack, num_episodes=10, seed=0):
             episode_rewards = step_envs(
                 get_action(frame_stack_tensor), eval_envs, episode_rewards,
                 frame_stack_tensor, reward_recorder, episode_length_recorder,
-                total_steps, total_episodes, trainer.device, frame_stack == 1)
+                total_steps, total_episodes, trainer.device)
         if total_episodes >= num_episodes:
             break
     return reward_recorder, episode_length_recorder
 
 
 class FrameStackTensor:
-    def __init__(self, num_envs, obs_shape, frame_stack, device):
+    def __init__(self, num_envs, obs_shape, device):
         self.num_channels = obs_shape[0]
-        self.obs_shape = (obs_shape[0] * frame_stack, *obs_shape[1:])
+        self.obs_shape = (obs_shape[0], *obs_shape[1:])
         self.current_obs = torch.zeros(num_envs, *self.obs_shape, device=device,
                                        dtype=torch.float)
         self.mask_shape = [1] * self.current_obs.dim()

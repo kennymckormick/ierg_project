@@ -9,17 +9,15 @@ of Information Engineering, The Chinese University of Hong Kong. Course
 Instructor: Professor ZHOU Bolei. Assignment author: PENG Zhenghao.
 """
 import os
-
-import gym
 import numpy as np
 import torch
-from torch.distributions import Categorical
 
-from .network import ActorCritic, MLP
+from .network import MLPActorCritic
 
 
+# updated to be consistent with new network
 class BaseTrainer:
-    def __init__(self, env, config, frame_stack=4, _test=False):
+    def __init__(self, env, config):
         self.device = config.device
         self.config = config
         self.lr = config.LR
@@ -30,18 +28,11 @@ class BaseTrainer:
         self.grad_norm_max = config.grad_norm_max
         self.eps = 1e-6
 
-        if isinstance(env.observation_space, gym.spaces.Tuple):
-            num_feats = env.observation_space[0].shape
-            self.num_actions = env.action_space[0].n
-        else:
-            num_feats = env.observation_space.shape
-            self.num_actions = env.action_space.n
-        self.num_feats = (num_feats[0] * frame_stack, *num_feats[1:])
+        num_feats = env.observation_space.shape
+        self.num_actions = env.action_space.n
+        self.num_feats = (num_feats[0], *num_feats[1:])
 
-        if _test:
-            self.model = MLP(num_feats[0], self.num_actions)
-        else:
-            self.model = ActorCritic(self.num_feats, self.num_actions)
+        self.model = MLPActorCritic(num_feats[0], self.num_actions)
         self.model = self.model.to(self.device)
         self.model.train()
 
@@ -60,56 +51,28 @@ class BaseTrainer:
     def update(self, rollout):
         raise NotImplementedError()
 
-    def compute_action(self, obs, deterministic=False):
+    def compute_action(self, obs):
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs).to(self.device)
-        logits, values = self.model(obs)
 
-        # [TODO] Get the action and action's log probabilities based on the
-        #  output logits
-        # Hint:
-        #   1. Use torch.distributions to help you build a distribution
-        #   2. Remember to check the shape of action and log prob.
-        #   3. When deterministic is True, return the action with maximum
-        #    probability
-        actions = None
-        action_log_probs = None
-        distribution = Categorical(logits=logits)
-        if deterministic:
-            action_probs, actions = torch.max(distribution.probs, dim=1)
-            action_log_probs = torch.log(action_probs)
-        else:
-            actions = distribution.sample()
-            action_log_probs = distribution.log_prob(actions)
-        pass
+        values, actions, action_log_probs = self.model.step(obs, eval=False)
 
         return values.view(-1, 1), actions.view(-1, 1), action_log_probs.view(
             -1, 1)
 
     def evaluate_actions(self, obs, act):
-        """Run models to get the values, log probability and action
-        distribution entropy of the action in current state"""
-        logits, values = self.model(obs)
-        # [TODO] Get the log probability of specified action, and the entropy of
-        #  current distribution w.r.t. the output logits.
-        # Hint: Use proper distribution to help you
-        action_log_probs = None
-        dist_entropy = None
-        distribution = Categorical(logits=logits)
-        act = act.view(-1)
-        action_log_probs = distribution.log_prob(act)
-        dist_entropy = distribution.entropy()
-        if dist_entropy.shape != ():
-            dist_entropy = torch.mean(dist_entropy)
-        pass
+        """Run models to get the values, log probability of the action in
+        current state"""
+        values = self.model.v(obs)
+        pi = self.model.pi._distribution(obs)
+        action_log_probs = self.model.pi._log_prob_from_distribution(pi, act)
 
-        assert dist_entropy.shape == ()
-        return values.view(-1, 1), action_log_probs.view(-1, 1), dist_entropy
+        return values.view(-1, 1), action_log_probs.view(-1, 1)
 
     def compute_values(self, obs):
         """Compute the values corresponding to current policy at current
         state"""
-        _, values = self.model(obs)
+        values = self.model.v(obs)
         return values
 
     def save_w(self, log_dir="", suffix=""):

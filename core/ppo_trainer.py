@@ -32,13 +32,11 @@ class PPOConfig:
 
         # Sample
         self.num_steps = 200  # num_steps * num_envs = sample_batch_size
-        self.resized_dim = 42
 
         # Learning
         self.GAMMA = 0.99
         self.LR = 5e-4
         self.grad_norm_max = 10.0
-        self.entropy_loss_weight = 0.01
         self.ppo_epoch = 10
         self.mini_batch_size = 500
         self.ppo_clip_param = 0.1
@@ -51,8 +49,8 @@ ppo_config = PPOConfig()
 
 
 class PPOTrainer(BaseTrainer):
-    def __init__(self, env, config, frame_stack=4, _test=False):
-        super(PPOTrainer, self).__init__(env, config, frame_stack, _test)
+    def __init__(self, env, config):
+        super(PPOTrainer, self).__init__(env, config)
 
         # There configs are only used in PPO
         self.num_sgd_steps = config.ppo_epoch
@@ -80,34 +78,25 @@ class PPOTrainer(BaseTrainer):
         assert adv_targ.shape == (self.mini_batch_size, 1)
         assert return_batch.shape == (self.mini_batch_size, 1)
 
-        values, action_log_probs, dist_entropy = self.evaluate_actions(
+        values, action_log_probs = self.evaluate_actions(
             observations_batch, actions_batch)
 
         assert values.shape == (self.mini_batch_size, 1)
         assert action_log_probs.shape == (self.mini_batch_size, 1)
         assert values.requires_grad
         assert action_log_probs.requires_grad
-        assert dist_entropy.requires_grad
 
-        # [TODO] Implement policy loss
-        policy_loss = None
-        pass
         ratio = torch.exp(action_log_probs - old_action_log_probs_batch)
         clip_adv = torch.clamp(ratio, 1 - self.clip_param,
                                1 + self.clip_param) * adv_targ
         policy_loss = torch.min(ratio * adv_targ, clip_adv)
         policy_loss = - policy_loss.mean()
 
-        # [TODO] Implement value loss
-        value_loss = None
-        pass
         value_loss = torch.nn.MSELoss()(values, return_batch)
 
-        # This is the total loss
-        loss = policy_loss + self.value_loss_weight * value_loss - \
-            self.entropy_loss_weight * dist_entropy
+        loss = policy_loss + self.value_loss_weight * value_loss
 
-        return loss, policy_loss, value_loss, dist_entropy
+        return loss, policy_loss, value_loss
 
     def update(self, rollout):
         # Get the normalized advantages
@@ -117,7 +106,6 @@ class PPOTrainer(BaseTrainer):
 
         value_loss_epoch = []
         policy_loss_epoch = []
-        dist_entropy_epoch = []
         total_loss_epoch = []
 
         # Train for num_sgd_steps iterations (compared to A2C which only
@@ -127,13 +115,7 @@ class PPOTrainer(BaseTrainer):
                 advantages, self.mini_batch_size)
 
             for sample in data_generator:
-                total_loss, policy_loss, value_loss, dist_entropy = \
-                    self.compute_loss(sample)
-
-                # [TODO] Conduct one mini-batch SGD updates
-                # Hint: Remember to clip the gradient to norm self.grad_norm_max
-                #  You should step self.optimizer.
-                pass
+                total_loss, policy_loss, value_loss = self.compute_loss(sample)
 
                 self.optimizer.zero_grad()
                 total_loss.backward()
@@ -144,7 +126,5 @@ class PPOTrainer(BaseTrainer):
                 value_loss_epoch.append(value_loss.item())
                 policy_loss_epoch.append(policy_loss.item())
                 total_loss_epoch.append(total_loss.item())
-                dist_entropy_epoch.append(dist_entropy.item())
 
-        return np.mean(policy_loss_epoch), np.mean(value_loss_epoch), \
-            np.mean(dist_entropy_epoch), np.mean(total_loss_epoch)
+        return np.mean(policy_loss_epoch), np.mean(value_loss_epoch), np.mean(total_loss_epoch)

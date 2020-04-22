@@ -12,60 +12,98 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-class ActorCritic(nn.Module):
-    def __init__(self, input_shape, num_actions):
-        super(ActorCritic, self).__init__()
-        init_ = lambda m: self.layer_init(m, nn.init.orthogonal_,
-                                          lambda x: nn.init.constant_(x, 0),
-                                          nn.init.calculate_gain('relu'))
-        # The network structure is designed for 42X42 observation.
-        self.conv1 = init_(
-            nn.Conv2d(input_shape[0], 16, kernel_size=4, stride=2))
-        self.conv2 = init_(
-            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=2))
-        self.conv3 = init_(nn.Conv2d(32, 256, kernel_size=11, stride=1))
-
-        init_ = lambda m: self.layer_init(
-            m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0))
-        self.critic_linear = init_(nn.Linear(self.feature_size(input_shape), 1))
-
-        init_ = lambda m: self.layer_init(
-            m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=0.01
-        )
-        self.actor_linear = init_(
-            nn.Linear(self.feature_size(input_shape), num_actions))
-
-        self.train()
-
-    def forward(self, inputs):
-        x = F.relu(self.conv1(inputs / 255.0))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(x.size(0), -1)
-        value = self.critic_linear(x)
-        logits = self.actor_linear(x)
-        return logits, value
-
-    def feature_size(self, input_shape):
-        return self.conv3(self.conv2(self.conv1(
-            torch.zeros(1, *input_shape)))).view(1, -1).size(1)
-
-    def layer_init(self, module, weight_init, bias_init, gain=1):
-        weight_init(module.weight.data, gain=gain)
-        bias_init(module.bias.data)
-        return module
+import numpy as np
+import scipy.signal
+from gym.spaces import Box, Discrete
+from torch.distributions.normal import Normal
+from torch.distributions.categorical import Categorical
 
 
-class MLP(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_size, 100)
-        self.policy = nn.Linear(100, output_size)
-        self.value = nn.Linear(100, 1)
+def mlp(sizes, activation, output_activation=nn.Identity):
+    layers = []
+    for j in range(len(sizes) - 1):
+        act = activation if j < len(sizes) - 2 else output_activation
+        layers += [nn.Linear(sizes[j], sizes[j + 1]), act()]
+    return nn.Sequential(*layers)
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        action = self.policy(x)
-        value = self.value(x)
-        return action, value
+
+class Actor(nn.Module):
+
+    def _distribution(self, obs):
+        raise NotImplementedError
+
+    def _log_prob_from_distribution(self, pi, act):
+        raise NotImplementedError
+
+    def forward(self, obs, act=None):
+        # Produce action distributions for given observations, and
+        # optionally compute the log likelihood of given actions under
+        # those distributions.
+        pi = self._distribution(obs)
+        logp_a = None
+        if act is not None:
+            logp_a = self._log_prob_from_distribution(pi, act)
+        return pi, logp_a
+
+
+class MLPGaussianActor(Actor):
+
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
+        super().__init__()
+        log_std = -0.5 * np.ones(act_dim, dtype=np.float32)
+        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
+        self.mu_net = mlp([obs_dim] + list(hidden_sizes) +
+                          [act_dim], activation)
+
+    def _distribution(self, obs):
+        mu = self.mu_net(obs)
+        std = torch.exp(self.log_std)
+        return Normal(mu, std)
+
+    def _log_prob_from_distribution(self, pi, act):
+        # Last axis sum needed for Torch Normal distribution
+        return pi.log_prob(act).sum(axis=-1)
+
+
+class MLPCritic(nn.Module):
+
+    def __init__(self, obs_dim, hidden_sizes, activation):
+        super().__init__()
+        self.v_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)
+
+    def forward(self, obs):
+        # not squeezing here, follow original setting
+        return self.v_net(obs)
+
+
+class MLPActorCritic(nn.Module):
+
+    def __init__(self, observation_space, action_space,
+                 hidden_sizes=(64, 64), activation=nn.Tanh):
+        super().__init__()
+
+        obs_dim = observation_space.shape[0]
+
+        # policy builder depends on action space
+        self.pi = MLPGaussianActor(
+            obs_dim, action_space.shape[0], hidden_sizes, activation)
+
+        # build value function
+        self.v = MLPCritic(obs_dim, hidden_sizes, activation)
+
+    def step(self, obs, eval=True):
+        if eval:
+            with torch.no_grad():
+                pi = self.pi._distribution(obs)
+                a = pi.sample()
+                logp_a = self.pi._log_prob_from_distribution(pi, a)
+                v = self.v(obs)
+        else:
+            pi = self.pi._distribution(obs)
+            a = pi.sample()
+            logp_a = self.pi._log_prob_from_distribution(pi, a)
+            v = self.v(obs)
+        return v, a, logp_a
+
+    def act(self, obs):
+        return self.step(obs)[0]
