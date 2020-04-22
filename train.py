@@ -18,6 +18,7 @@ from collections import deque
 import gym
 import numpy as np
 import torch
+import json
 from env import make_envs
 
 from core.ppo_trainer import PPOTrainer, ppo_config
@@ -71,6 +72,16 @@ parser.add_argument(
     type=str,
     help="The environment id"
 )
+parser.add_argument(
+    "--envopt",
+    default=None,
+    type=str,
+)
+parser.add_argument(
+    "--trainopt",
+    default=None,
+    type=str,
+)
 args = parser.parse_args()
 
 env_options = {}
@@ -79,12 +90,20 @@ trainer_options = {}
 
 def train(args):
     # Verify algorithm and config
+    global env_options, trainer_options
     algo = args.algo
     if algo == "PPO":
         config = ppo_config
     else:
         raise ValueError("args.algo must in [PPO]")
     config.num_envs = args.num_envs
+    if args.envopt is not None:
+        f = open(args.envopt)
+        env_options = json.load(f)
+    if args.trainopt is not None:
+        f = open(args.trainopt)
+        trainer_options = json.load(f)
+
     for k, v in trainer_options.items():
         setattr(config, k, v)
 
