@@ -38,7 +38,7 @@ class BaseTrainer:
         self.act_coeff = self.act_high[0]
 
         self.model = MLPActorCritic(
-            num_feats, self.num_actions, hidden_sizes=config.hidden_sizes, activation=config.activation,
+            self.num_obs, self.num_act, hidden_sizes=config.hidden_sizes, activation=config.activation,
             act_coeff=self.act_coeff)
         self.model = self.model.to(self.device)
         self.model.train()
