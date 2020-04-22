@@ -27,18 +27,18 @@ class BaseTrainer:
         self.grad_norm_max = config.grad_norm_max
         self.eps = 1e-6
 
-        self.num_obs = env.observation_space.shape[0]
-        self.num_act = env.action_space.shape[0]
+        self.obs_dim = env.observation_space.shape[0]
+        self.act_dim = env.action_space.shape[0]
         self.act_high = env.action_space.high
         self.act_low = env.action_space.low
 
-        assert sum(self.act_high == self.act_high[0]) == self.num_act
-        assert sum(self.act_low == self.act_low[0]) == self.num_act
+        assert sum(self.act_high == self.act_high[0]) == self.act_dim
+        assert sum(self.act_low == self.act_low[0]) == self.act_dim
         assert self.act_high[0] == -self.act_low[0]
         self.act_coeff = self.act_high[0]
 
         self.model = MLPActorCritic(
-            self.num_obs, self.num_act, hidden_sizes=config.hidden_sizes, activation=config.activation,
+            self.obs_dim, self.act_dim, hidden_sizes=config.hidden_sizes, activation=config.activation,
             act_coeff=self.act_coeff)
         self.model = self.model.to(self.device)
         self.model.train()
