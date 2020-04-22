@@ -84,8 +84,6 @@ def train(args):
     else:
         raise ValueError("args.algo must in [PPO]")
     config.num_envs = args.num_envs
-    assert args.env_id in ["CompetitivePong-v0", "CartPole-v0",
-                           "CompetitivePongTournament-v0"]
 
     # Seed the environments and setup torch
     seed = args.seed
