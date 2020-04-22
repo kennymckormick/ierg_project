@@ -15,11 +15,11 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 
 class A2CRolloutStorage:
-    def __init__(self, num_steps, num_processes, obs_shape, device):
+    def __init__(self, num_steps, num_processes, obs_dim, device):
         def zeros(*shapes):
             return torch.zeros(*shapes).to(device)
 
-        self.observations = zeros(num_steps + 1, num_processes, *obs_shape)
+        self.observations = zeros(num_steps + 1, num_processes, obs_dim)
         self.rewards = zeros(num_steps, num_processes, 1)
         self.value_preds = zeros(num_steps + 1, num_processes, 1)
         self.returns = zeros(num_steps + 1, num_processes, 1)
@@ -62,9 +62,9 @@ class A2CRolloutStorage:
 
 
 class PPORolloutStorage(A2CRolloutStorage):
-    def __init__(self, num_steps, num_processes, obs_shape, device,
+    def __init__(self, num_steps, num_processes, obs_dim, device,
                  use_gae=True, gae_lambda=0.95):
-        super().__init__(num_steps, num_processes, obs_shape, device)
+        super().__init__(num_steps, num_processes, obs_dim, device)
         self.gae = use_gae
         self.gae_lambda = gae_lambda
 

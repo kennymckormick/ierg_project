@@ -68,7 +68,7 @@ class PPOTrainer(BaseTrainer):
 
     def setup_rollouts(self):
         self.rollouts = PPORolloutStorage(self.num_steps, self.num_envs,
-                                          self.num_feats, self.device,
+                                          self.obs_dim, self.device,
                                           self.config.USE_GAE,
                                           self.config.gae_lambda)
 
