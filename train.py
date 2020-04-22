@@ -139,7 +139,7 @@ def train(args):
     eval_env = gym.make(
         env_id, healthy_z_range=healthy_z_range, healthy_reward=0)
     if env_id == "Walker2d-v3":
-        eval_env = Walker2d_wrapper(env, env_options)
+        eval_env = Walker2d_wrapper(eval_env, env_options)
 
     obs_dim = envs.observation_space.shape[0]
     act_dim = envs.action_space.shape[0]
