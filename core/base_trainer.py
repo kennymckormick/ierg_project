@@ -19,6 +19,18 @@ from .network import MLPActorCritic
 # updated to be consistent with new network
 class BaseTrainer:
     def __init__(self, env, config, myconfig={}):
+        act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
+                     'Tanh': nn.Tanh, 'Identity': nn.Identity}
+        if 'activation' in myconfig:
+            config.activation = act_funcs[myconfig['activation']]
+            myconfig.pop('activation')
+        if 'output_activation' in myconfig:
+            config.output_activation = act_funcs[myconfig['output_activation']]
+            myconfig.pop('output_activation')
+        # can be real_obs_dim, real_act_dim, pretrain_pth, etc.
+        for k, v in myconfig.items():
+            setattr(config, k, v)
+
         self.device = config.device
         self.config = config
         self.lr = config.LR
@@ -35,18 +47,6 @@ class BaseTrainer:
         # should be in config
         config.real_obs_dim = self.obs_dim
         config.real_act_dim = self.act_dim
-
-        act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
-                     'Tanh': nn.Tanh, 'Identity': nn.Identity}
-        if 'activation' in myconfig:
-            config.activation = act_funcs[myconfig['activation']]
-            myconfig.pop('activation')
-        if 'output_activation' in myconfig:
-            config.output_activation = act_funcs[myconfig['output_activation']]
-            myconfig.pop('output_activation')
-        # can be real_obs_dim, real_act_dim, pretrain_pth, etc.
-        for k, v in myconfig.items():
-            setattr(config, k, v)
 
         assert sum(self.act_high == self.act_high[0]) == self.act_dim
         assert sum(self.act_low == self.act_low[0]) == self.act_dim
