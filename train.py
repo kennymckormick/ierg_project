@@ -83,6 +83,12 @@ parser.add_argument(
     default=None,
     type=str,
 )
+
+parser.add_argument(
+    "--opt",
+    default=None,
+    type=str,
+)
 args = parser.parse_args()
 
 env_options = {}
@@ -104,6 +110,10 @@ def train(args):
     if args.trainopt is not None:
         f = open(args.trainopt)
         trainer_options = json.load(f)
+    if args.opt is not None:
+        opt = json.load(open(args.opt))
+        env_options = opt['env']
+        trainer_options = opt['trainer']
 
     # Seed the environments and setup torch
     seed = args.seed
