@@ -1,0 +1,1 @@
+{"activation": "ReLU", "output_activation": "Sigmoid", "real_obs_dim": 46, "real_act_dim": 11}
