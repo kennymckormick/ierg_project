@@ -105,9 +105,6 @@ def train(args):
         f = open(args.trainopt)
         trainer_options = json.load(f)
 
-    for k, v in trainer_options.items():
-        setattr(config, k, v)
-
     # Seed the environments and setup torch
     seed = args.seed
     torch.manual_seed(seed)
@@ -154,7 +151,7 @@ def train(args):
 
     # Setup trainer
     if algo == "PPO":
-        trainer = PPOTrainer(envs, config)
+        trainer = PPOTrainer(envs, config, trainer_options)
     else:
         raise NotImplementedError
 

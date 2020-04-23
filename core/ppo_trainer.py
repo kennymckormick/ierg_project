@@ -45,7 +45,8 @@ class PPOConfig:
         self.value_loss_weight = 1.0
         self.hidden_sizes = (64, 64)
         self.activation = nn.Tanh
-        self.output_activation = nn.Identitys
+        self.output_activation = nn.Identity
+        self.pretrain_pth = None
 
 
 ppo_config = PPOConfig()
@@ -68,7 +69,7 @@ class PPOTrainer(BaseTrainer):
 
     def setup_rollouts(self):
         self.rollouts = PPORolloutStorage(self.num_steps, self.num_envs,
-                                          self.real_obs_dim, self.real_act_dim,
+                                          self.config.real_obs_dim, self.config.real_act_dim,
                                           self.device, self.config.USE_GAE,
                                           self.config.gae_lambda)
 

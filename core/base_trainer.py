@@ -32,9 +32,9 @@ class BaseTrainer:
         self.act_dim = env.action_space.shape[0]
         self.act_high = env.action_space.high
         self.act_low = env.action_space.low
-        self.real_obs_dim = self.obs_dim
-        self.real_act_dim = self.act_dim
-        self.pretrain_pth = None
+        # should be in config
+        config.real_obs_dim = self.obs_dim
+        config.real_act_dim = self.act_dim
 
         act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
                      'Tanh': nn.Tanh, 'Identity': nn.Identity}
@@ -51,12 +51,12 @@ class BaseTrainer:
         assert sum(self.act_high == self.act_high[0]) == self.act_dim
         assert sum(self.act_low == self.act_low[0]) == self.act_dim
         assert self.act_high[0] == -self.act_low[0]
-        self.act_coeff = self.act_high[0]
+        config.act_coeff = self.act_high[0]
 
         self.model = MLPActorCritic(
-            self.real_obs_dim, self.real_act_dim, hidden_sizes=config.hidden_sizes,
+            config.real_obs_dim, config.real_act_dim, hidden_sizes=config.hidden_sizes,
             activation=config.activation, output_activation=config.output_activation,
-            act_coeff=self.act_coeff, pretrain_pth=config.pretrain_pth)
+            act_coeff=config.act_coeff, pretrain_pth=config.pretrain_pth)
 
         self.model = self.model.to(self.device)
         self.model.train()
