@@ -45,14 +45,15 @@ class PPOConfig:
         self.value_loss_weight = 1.0
         self.hidden_sizes = (64, 64)
         self.activation = nn.Tanh
+        self.output_activation = nn.Identitys
 
 
 ppo_config = PPOConfig()
 
 
 class PPOTrainer(BaseTrainer):
-    def __init__(self, env, config):
-        super(PPOTrainer, self).__init__(env, config)
+    def __init__(self, env, config, myconfig={}):
+        super(PPOTrainer, self).__init__(env, config, myconfig)
 
         # There configs are only used in PPO
         self.num_sgd_steps = config.ppo_epoch

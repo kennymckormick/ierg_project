@@ -36,9 +36,6 @@ class Actor(nn.Module):
         raise NotImplementedError
 
     def forward(self, obs, act=None):
-        # Produce action distributions for given observations, and
-        # optionally compute the log likelihood of given actions under
-        # those distributions.
         pi = self._distribution(obs)
         logp_a = None
         if act is not None:
@@ -48,13 +45,14 @@ class Actor(nn.Module):
 
 class MLPGaussianActor(Actor):
 
-    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_coeff):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation=nn.Tanh,
+                 output_activation=nn.Identity, act_coeff=1.0):
         super().__init__()
         self.act_coeff = act_coeff
         log_std = -0.5 * np.ones(act_dim, dtype=np.float32) * self.act_coeff
         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.mu_net = mlp([obs_dim] + list(hidden_sizes) +
-                          [act_dim], activation)
+                          [act_dim], activation, output_activation)
 
     def _distribution(self, obs):
         mu = self.mu_net(obs) * self.act_coeff
@@ -78,12 +76,13 @@ class MLPCritic(nn.Module):
 
 class MLPActorCritic(nn.Module):
 
-    def __init__(self, obs_dim, act_dim,
-                 hidden_sizes=(64, 64), activation=nn.Tanh, act_coeff=1.0, pretrain_pth=None):
+    def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64),
+                 activation=nn.Tanh, output_activation=nn.Identity,
+                 act_coeff=1.0, pretrain_pth=None):
         super().__init__()
         # policy builder depends on action space
         self.pi = MLPGaussianActor(
-            obs_dim, act_dim, hidden_sizes, activation, act_coeff)
+            obs_dim, act_dim, hidden_sizes, activation, output_activation, act_coeff)
 
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
         if pretrain_pth is not None:

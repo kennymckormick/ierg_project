@@ -11,13 +11,14 @@ Instructor: Professor ZHOU Bolei. Assignment author: PENG Zhenghao.
 import os
 import numpy as np
 import torch
+from torch import nn
 
 from .network import MLPActorCritic
 
 
 # updated to be consistent with new network
 class BaseTrainer:
-    def __init__(self, env, config):
+    def __init__(self, env, config, myconfig={}):
         self.device = config.device
         self.config = config
         self.lr = config.LR
@@ -33,14 +34,19 @@ class BaseTrainer:
         self.act_low = env.action_space.low
         self.real_obs_dim = self.obs_dim
         self.real_act_dim = self.act_dim
-        if hasattr(config, 'real_obs_dim'):
-            self.real_obs_dim = config.real_obs_dim
-        if hasattr(config, 'real_act_dim'):
-            self.real_act_dim = config.real_act_dim
-
         self.pretrain_pth = None
-        if hasattr(config, 'pretrain_pth'):
-            self.pretrain_pth = config.pretrain_pth
+
+        act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
+                     'Tanh': nn.Tanh, 'Identity': nn.Identity}
+        if 'activation' in myconfig:
+            config.activation = act_funcs[myconfig['activation']]
+            myconfig.pop('activation')
+        if 'output_activation' in myconfig:
+            config.output_activation = act_funcs[myconfig['output_activation']]
+            myconfig.pop('output_activation')
+        # can be real_obs_dim, real_act_dim, pretrain_pth, etc.
+        for k, v in myconfig.items():
+            setattr(config, k, v)
 
         assert sum(self.act_high == self.act_high[0]) == self.act_dim
         assert sum(self.act_low == self.act_low[0]) == self.act_dim
@@ -49,7 +55,9 @@ class BaseTrainer:
 
         self.model = MLPActorCritic(
             self.real_obs_dim, self.real_act_dim, hidden_sizes=config.hidden_sizes,
-            activation=config.activation, act_coeff=self.act_coeff, pretrain_pth=self.pretrain_pth)
+            activation=config.activation, output_activation=config.output_activation,
+            act_coeff=self.act_coeff, pretrain_pth=config.pretrain_pth)
+
         self.model = self.model.to(self.device)
         self.model.train()
 
