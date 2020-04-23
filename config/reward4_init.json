@@ -1,0 +1,1 @@
+{"env": {"reward_threshold": 4}, "trainer": {"pretrain_pth": "work_dirs/walker2d/checkpoint-iter3200.pkl"}}

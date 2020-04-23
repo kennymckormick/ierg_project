@@ -1,0 +1,1 @@
+{"env": {"healthy_z_range": [1.1, 1.4]}, "trainer": {"pretrain_pth": "work_dirs/walker2d/checkpoint-iter3200.pkl"}}
