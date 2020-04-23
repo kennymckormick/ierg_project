@@ -140,7 +140,7 @@ def evaluate(trainer, eval_env, num_episodes=10, seed=0, dim_dict=None):
         def policy(obs_array):
             obs = torch.Tensor(obs_array).reshape([1, -1]).to(trainer.device)
             with torch.no_grad():
-                act = trainer.model.pi.mu_net(obs)
+                act = trainer.model.pi.mu_net(obs) * trainer.model.pi.act_coeff
             return act.cpu().numpy().reshape([-1])
 
         action = policy(obs)
