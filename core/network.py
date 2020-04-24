@@ -150,7 +150,7 @@ class MTMTMLPGaussianActor(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation=nn.Tanh,
                  output_activation=nn.Identity, act_coeff=[0.4, 1]):
         super(MTMTMLPGaussianActor, self).__init__()
-        self.act_coeff = act_coeff
+        self.act_coeff = {'a': act_coeff[0], 'b': act_coeff[1]}
         log_std_a = -0.5 * \
             np.ones(act_dim[0], dtype=np.float32) * self.act_coeff[0]
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
@@ -164,7 +164,7 @@ class MTMTMLPGaussianActor(nn.Module):
 
     def _distribution(self, obs, branch='a'):
         assert branch in ['a', 'b']
-        mu = self.mu_net(obs, branch) * self.act_coeff
+        mu = self.mu_net(obs, branch) * self.act_coeff[branch]
         std = torch.exp(self.log_std_a if branch == 'a' else self.log_std_b)
         return Normal(mu, std)
 
