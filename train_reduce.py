@@ -162,8 +162,8 @@ def train(args):
     else:
         raise NotImplementedError
 
-    frame_stack_tensors = [FrameStackTensor(num_envs, obs_dim, config.device),
-                           FrameStackTensor(num_envs, obs_dim, config.device)]
+    frame_stack_tensors = [FrameStackTensor(num_envs, main_envs.observation_space.shape, config.device),
+                           FrameStackTensor(num_envs, aux_envs.observation_space.shape, config.device)]
 
     # Setup some stats helpers
     episode_rewards = [np.zeros([num_envs, 1], dtype=np.float), np.zeros([
