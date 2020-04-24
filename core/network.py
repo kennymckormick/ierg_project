@@ -51,6 +51,43 @@ class mtmlp(nn.Module):
             return self.headb(feat)
 
 
+class mtmtmlp(nn.Module):
+    def __init__(self, in_channels, out_channels, mid_channels, activation, output_activation=nn.Identity):
+        super(mtmtmlp, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.mid_channels = mid_channels
+
+        self.heada = nn.Sequential(
+            *[nn.Linear(in_channels[0], mid_channels[0]), activation()])
+        self.headb = nn.Sequential(
+            *[nn.Linear(in_channels[1], mid_channels[0]), activation()])
+
+        num_layers = len(mid_channels)
+        layers = []
+        for j in range(num_layers - 2):
+            layers += [nn.Linear(mid_channels[j],
+                                 mid_channels[j + 1]), activation()]
+
+        self.backbone = nn.Sequential(*layers)
+        self.taila = nn.Sequential(
+            *[nn.Linear(mid_channels[-1], out_channels[0]), output_activation()])
+        self.tailb = nn.Sequential(
+            *[nn.Linear(mid_channels[-1], out_channels[1]), output_activation()])
+
+    def forward(self, x, branch='a'):
+        assert branch in ['a', 'b']
+        if branch == 'a':
+            x = self.heada(x)
+            x = self.backbone(x)
+            x = self.taila(x)
+        else:
+            x = self.headb(x)
+            x = self.backbone(x)
+            x = self.tailb(x)
+        return x
+
+
 class MLPGaussianActor(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation=nn.Tanh,
                  output_activation=nn.Identity, act_coeff=1.0):
@@ -108,8 +145,41 @@ class MTMLPGaussianActor(nn.Module):
         return pi, logp_a
 
 
-class MLPCritic(nn.Module):
+# obs_dim, act_dim, act_coeff should be [a, b]
+class MTMTMLPGaussianActor(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation=nn.Tanh,
+                 output_activation=nn.Identity, act_coeff=[0.4, 1]):
+        super(MTMTMLPGaussianActor, self).__init__()
+        self.act_coeff = act_coeff
+        log_std_a = -0.5 * \
+            np.ones(act_dim[0], dtype=np.float32) * self.act_coeff[0]
+        self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
+        log_std_b = -0.5 * \
+            np.ones(act_dim[1], dtype=np.float32) * self.act_coeff[1]
+        self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
+
+        self.mu_net = mtmtmlp(obs_dim, act_dim, hidden_sizes,
+                              activation, output_activation)
+
+    def _distribution(self, obs, branch='a'):
+        assert branch in ['a', 'b']
+        mu = self.mu_net(obs, branch) * self.act_coeff
+        std = torch.exp(self.log_std_a if branch == 'a' else self.log_std_b)
+        return Normal(mu, std)
+
+    def _log_prob_from_distribution(self, pi, act):
+        return pi.log_prob(act).sum(axis=-1, keepdim=True)
+
+    def forward(self, obs, act=None, branch='a'):
+        pi = self._distribution(obs, branch)
+        logp_a = None
+        if act is not None:
+            logp_a = self._log_prob_from_distribution(pi, act)
+        return pi, logp_a
+
+
+class MLPCritic(nn.Module):
     def __init__(self, obs_dim, hidden_sizes, activation):
         super().__init__()
         self.v_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)
@@ -123,6 +193,16 @@ class MTMLPCritic(nn.Module):
     def __init__(self, obs_dim, hidden_sizes, activation):
         super(MTMLPCritic, self).__init__()
         self.v_net = mtmlp([obs_dim] + list(hidden_sizes) + [1], activation)
+
+    def forward(self, obs, branch='a'):
+        # not squeezing here, follow original setting
+        return self.v_net(obs, branch)
+
+
+class MTMTMLPCritic(nn.Module):
+    def __init__(self, obs_dim, hidden_sizes, activation):
+        super(MTMTMLPCritic, self).__init__()
+        self.v_net = mtmtmlp(obs_dim, [1, 1], hidden_sizes, activation)
 
     def forward(self, obs, branch='a'):
         # not squeezing here, follow original setting
@@ -169,6 +249,35 @@ class MTMLPActorCritic(nn.Module):
             obs_dim, act_dim, hidden_sizes, activation, output_activation, act_coeff)
 
         self.v = MTMLPCritic(obs_dim, hidden_sizes, activation)
+        if pretrain_pth is not None:
+            wt = torch.load(pretrain_pth)
+            if 'model' in wt:
+                wt = wt['model']
+            self.load_state_dict(wt)
+
+    def step(self, obs, deterministic=False, branch='a'):
+        with torch.no_grad():
+            pi = self.pi._distribution(obs, branch)
+            if deterministic:
+                a = pi.mean
+            else:
+                a = pi.sample()
+            logp_a = self.pi._log_prob_from_distribution(pi, a)
+            v = self.v(obs, branch)
+        return v, a, logp_a
+
+
+# obs_dim should be [a, b], act_dim should be [a, b]
+class MTMTMLPActorCritic(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64),
+                 activation=nn.Tanh, output_activation=nn.Identity,
+                 act_coeff=[0.4, 1.0], pretrain_pth=None):
+        super().__init__()
+        # policy builder depends on action space
+        self.pi = MTMTMLPGaussianActor(
+            obs_dim, act_dim, hidden_sizes, activation, output_activation, act_coeff)
+
+        self.v = MTMTMLPCritic(obs_dim, hidden_sizes, activation)
         if pretrain_pth is not None:
             wt = torch.load(pretrain_pth)
             if 'model' in wt:
