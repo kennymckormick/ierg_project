@@ -155,6 +155,7 @@ def train(args):
 
     dim_dict = dict(obs_a=obs_dim, act_a=act_dim, obs_b=46,
                     act_b=11, coeff_a=0.4, coeff_b=0.4)
+    dim_dict['act_dim'] = act_dim
 
     # Setup trainer
     if algo == "PPO":
@@ -204,7 +205,7 @@ def train(args):
                             frame_stack_tensors[ind].get(), obs_dims[ind]),
                         deterministic=False, branch=branch_names[ind])
                     cpu_actions = actions.cpu().numpy()
-                    cpu_actions = enlarge_shape(cpu_actions, act_dims[ind])
+                    cpu_actions = enlarge_shape(cpu_actions, 17)
 
                     # obs, done, info not needed, we have masks & obs in frame_stack_tensors
                     _, reward, _, _, masks, new_total_episodes, new_total_steps, episode_rewards[ind] = \

@@ -152,11 +152,11 @@ class MTMTMLPGaussianActor(nn.Module):
         super(MTMTMLPGaussianActor, self).__init__()
         self.act_coeff = {'a': act_coeff[0], 'b': act_coeff[1]}
         log_std_a = -0.5 * \
-            np.ones(act_dim[0], dtype=np.float32) * self.act_coeff[0]
+            np.ones(act_dim[0], dtype=np.float32) * self.act_coeff['a']
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
         log_std_b = -0.5 * \
-            np.ones(act_dim[1], dtype=np.float32) * self.act_coeff[1]
+            np.ones(act_dim[1], dtype=np.float32) * self.act_coeff['b']
         self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
 
         self.mu_net = mtmtmlp(obs_dim, act_dim, hidden_sizes,
