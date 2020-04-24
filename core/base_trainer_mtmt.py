@@ -33,7 +33,7 @@ class BaseTrainerMTMT:
         self.obs_a = dim_dict['obs_a']
         self.obs_b = dim_dict['obs_b']
         self.act_a = dim_dict['act_a']
-        self.act_a = dim_dict['act_b']
+        self.act_b = dim_dict['act_b']
         self.coeff_a = dim_dict['coeff_a']
         self.coeff_b = dim_dict['coeff_b']
         self.obs_dim = [self.obs_a, self.obs_b]
