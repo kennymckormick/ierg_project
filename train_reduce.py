@@ -19,6 +19,7 @@ import gym
 import numpy as np
 import torch
 import json
+from torch import nn
 from env import make_envs
 
 from core.ppo_trainer_mtmt import PPOTrainerMTMT, ppo_config
@@ -98,6 +99,7 @@ def train(args):
         config = ppo_config
     else:
         raise ValueError("args.algo must in [PPO]")
+    config.activation = nn.ReLU
     config.num_envs = args.num_envs
     if args.trainopt is not None:
         f = open(args.trainopt)
