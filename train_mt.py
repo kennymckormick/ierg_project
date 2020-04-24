@@ -21,7 +21,7 @@ import torch
 import json
 from env import make_envs
 
-from core.ppo_trainer import PPOTrainerMT, ppo_config
+from core.ppo_trainer_mt import PPOTrainerMT, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
     summary, save_progress, FrameStackTensor, step_envs, reduce_shape, enlarge_shape
 from env.make_envs import Walker2d_wrapper
