@@ -21,7 +21,7 @@ import torch
 import json
 from env import make_envs
 
-from core.ppo_trainer import PPOTrainer, ppo_config
+from core.ppo_trainer import PPOTrainerMT, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
     summary, save_progress, FrameStackTensor, step_envs, reduce_shape, enlarge_shape
 from env.make_envs import Walker2d_wrapper
@@ -47,12 +47,6 @@ parser.add_argument(
     default=15,
     type=int,
     help="The number of parallel environments. Default: 15"
-)
-parser.add_argument(
-    "--learning-rate", "-LR",
-    default=5e-4,
-    type=float,
-    help="The learning rate. Default: 5e-4"
 )
 parser.add_argument(
     "--seed",
@@ -95,6 +89,7 @@ env_options = {}
 trainer_options = {}
 
 
+# Only env option exists in the case
 def train(args):
     # Verify algorithm and config
     global env_options, trainer_options
@@ -128,7 +123,8 @@ def train(args):
     # Create vectorized environments
     num_envs = args.num_envs
     env_id = args.env_id
-    envs = make_envs(
+
+    main_envs = make_envs(
         env_id=env_id,
         seed=seed,
         log_dir=log_dir,
@@ -137,6 +133,17 @@ def train(args):
         options=env_options,
     )
 
+    aux_envs = make_envs(
+        env_id=env_id,
+        seed=seed,
+        log_dir=log_dir,
+        num_envs=num_envs,
+        asynchronous=True,
+    )
+
+    envs = [main_envs, aux_envs]
+
+    # eval_env is main_env
     if env_id == "Walker2d-v3":
         healthy_z_range = (0.8, 2.0)
     elif env_id == 'Humanoid-v3':
@@ -148,34 +155,38 @@ def train(args):
     if env_id == "Walker2d-v3":
         eval_env = Walker2d_wrapper(eval_env, env_options)
 
-    obs_dim = envs.observation_space.shape[0]
-    act_dim = envs.action_space.shape[0]
+    obs_dim = main_envs.observation_space.shape[0]
+    act_dim = main_envs.action_space.shape[0]
+
     real_obs_dim = obs_dim
     real_act_dim = act_dim
     if 'real_obs_dim' in trainer_options:
         real_obs_dim = trainer_options['real_obs_dim']
     if 'real_act_dim' in trainer_options:
         real_act_dim = trainer_options['real_act_dim']
+
+    # we don't care, doesn't bother
     dim_dict = dict(obs_dim=obs_dim, act_dim=act_dim,
                     real_obs_dim=real_obs_dim, real_act_dim=real_act_dim)
 
     # Setup trainer
     if algo == "PPO":
-        trainer = PPOTrainer(envs, config, trainer_options)
+        trainer = PPOTrainerMT(main_envs, aux_envs, config, trainer_options)
     else:
         raise NotImplementedError
 
-    # Create a placeholder tensor to help stack frames in 2nd dimension
-    # That is turn the observation from shape [num_envs, 1, 84, 84] to
-    # [num_envs, 4, 84, 84].
-    frame_stack_tensor = FrameStackTensor(
-        num_envs, envs.observation_space.shape, config.device)
+    frame_stack_tensors = [FrameStackTensor(num_envs, main_envs.observation_space.shape, config.device),
+                           FrameStackTensor(num_envs, aux_envs.observation_space.shape, config.device)]
 
     # Setup some stats helpers
-    episode_rewards = np.zeros([num_envs, 1], dtype=np.float)
+    episode_rewards = [np.zeros([num_envs, 1], dtype=np.float), np.zeros([
+        num_envs, 1], dtype=np.float)]
+
     total_episodes = total_steps = iteration = 0
-    reward_recorder = deque(maxlen=100)
-    episode_length_recorder = deque(maxlen=100)
+
+    reward_recorders = [deque(maxlen=100), deque(maxlen=100)]
+    episode_length_recorders = [deque(maxlen=100), deque(maxlen=100)]
+
     sample_timer = Timer()
     process_timer = Timer()
     update_timer = Timer()
@@ -185,55 +196,63 @@ def train(args):
 
     # Start training
     print("Start training!")
-    obs = envs.reset()
-    frame_stack_tensor.update(obs)
-    trainer.rollouts.observations[0].copy_(
-        reduce_shape(frame_stack_tensor.get(), real_obs_dim))
+    obs = [envs[i].reset() for i in range(2)]
+    _ = [frame_stack_tensors[i].update(obs[i]) for i in range(2)]
+
+    # first update
+    for i in range(2):
+        trainer.rollouts[i].observations[0].copy_(
+            reduce_shape(frame_stack_tensors[i].get(), real_obs_dim))
+
+    branch_names = ['a', 'b']
+
     while True:  # Break when total_steps exceeds maximum value
         with sample_timer:
-            for index in range(config.num_steps):
+            # prepare rollout a
+            for ind in range(2):
+                for index in range(config.num_steps):
+                    trainer.model.eval()
+                    values, actions, action_log_prob = trainer.model.step(
+                        reduce_shape(frame_stack_tensors[ind].get(), real_obs_dim), branch_names[ind])
+                    cpu_actions = actions.cpu().numpy()
+                    cpu_actions = enlarge_shape(cpu_actions, act_dim)
 
-                trainer.model.eval()
-                values, actions, action_log_prob = trainer.model.step(
-                    reduce_shape(frame_stack_tensor.get(), real_obs_dim))
+                    # obs, done, info not needed, we have masks & obs in frame_stack_tensors
+                    _, reward, _, _, masks, total_episodes, total_steps, episode_rewards[ind] = \
+                        step_envs(cpu_actions, envs[ind], episode_rewards[ind], frame_stack_tensors[ind],
+                                  reward_recorders[ind], episode_length_recorders[ind],
+                                  total_steps, total_episodes, config.device)
 
-                cpu_actions = actions.cpu().numpy()
-                cpu_actions = enlarge_shape(cpu_actions, act_dim)
+                    rewards = torch.from_numpy(
+                        reward.astype(np.float32)).view(-1, 1).to(config.device)
 
-                obs, reward, done, info, masks, total_episodes, \
-                    total_steps, episode_rewards = step_envs(
-                        cpu_actions, envs, episode_rewards, frame_stack_tensor,
-                        reward_recorder, episode_length_recorder, total_steps,
-                        total_episodes, config.device)
-
-                rewards = torch.from_numpy(
-                    reward.astype(np.float32)).view(-1, 1).to(config.device)
-
-                # Store samples
-                trainer.rollouts.insert(
-                    reduce_shape(frame_stack_tensor.get(),
-                                 real_obs_dim), actions,
-                    action_log_prob, values, rewards, masks)
+                    trainer.rollouts[ind].insert(
+                        reduce_shape(frame_stack_tensors[ind].get(),
+                                     real_obs_dim), actions,
+                        action_log_prob, values, rewards, masks)
 
         # ===== Process Samples =====
         with process_timer:
             with torch.no_grad():
-                next_value = trainer.compute_values(
-                    trainer.rollouts.observations[-1])
-            trainer.rollouts.compute_returns(next_value, config.GAMMA)
+                for i in range(2):
+                    next_value = trainer.compute_values(
+                        trainer.rollouts[i].observations[-1], branch_names[i])
+                    trainer.rollouts[i].compute_returns(
+                        next_value, config.GAMMA)
 
         trainer.model.train()
         # ===== Update Policy =====
         with update_timer:
-            policy_loss, value_loss, total_loss = trainer.update(
-                trainer.rollouts)
-            trainer.rollouts.after_update()
+            losses = trainer.update(trainer.rollouts[0], trainer.rollouts[1])
+            policy_loss, value_loss, total_loss = list(zip(*losses))
+            trainer.rollouts[0].after_update()
+            trainer.rollouts[1].after_update()
 
         # ===== Evaluate Current Policy =====
         if iteration % config.eval_freq == 0:
             eval_timer = Timer()
-            rewards, eplens = evaluate(
-                trainer, eval_env, 1, dim_dict=dim_dict)
+            # seems ok, by default model is dealing with task1
+            rewards, eplens = evaluate(trainer, eval_env, 1, dim_dict=dim_dict)
             evaluate_stat = summary(rewards, "episode_reward")
             evaluate_stat.update(summary(eplens, "episode_length"))
             evaluate_stat.update(dict(
@@ -246,15 +265,24 @@ def train(args):
             stats = dict(
                 log_dir=log_dir,
                 frame_per_second=int(total_steps / total_timer.now),
-                training_episode_reward=summary(reward_recorder,
-                                                "episode_reward"),
-                training_episode_length=summary(episode_length_recorder,
-                                                "episode_length"),
+                training_episode_reward_a=summary(reward_recorders[0],
+                                                  "episode_reward"),
+                training_episode_length_a=summary(episode_length_recorders[0],
+                                                  "episode_length"),
+                training_episode_reward_b=summary(reward_recorders[1],
+                                                  "episode_reward"),
+                training_episode_length_b=summary(episode_length_recorders[1],
+                                                  "episode_length"),
                 evaluate_stats=evaluate_stat,
-                learning_stats=dict(
-                    policy_loss=policy_loss,
-                    value_loss=value_loss,
-                    total_loss=total_loss
+                learning_stats_a=dict(
+                    policy_loss=policy_loss[0],
+                    value_loss=value_loss[0],
+                    total_loss=total_loss[0]
+                ),
+                learning_stats_b=dict(
+                    policy_loss=policy_loss[1],
+                    value_loss=value_loss[1],
+                    total_loss=total_loss[1]
                 ),
                 total_steps=total_steps,
                 total_episodes=total_episodes,

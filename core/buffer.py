@@ -85,18 +85,6 @@ class PPORolloutStorage(A2CRolloutStorage):
             self.value_preds[-1] = next_value
             gae = 0
             for step in reversed(range(self.rewards.size(0))):
-                # [TODO] Implement GAE advantage computing here.
-                # Hint:
-                #  1. Return at timestep t should be (advantage_t + value_t)
-                #  2. You should use reward, values, mask to compute TD error
-                #   delta. Then combine TD error of timestep t with advantage
-                #   of timestep t+1 to get the advantage of timestep t.
-                #  3. The variable `gae` represents the advantage
-                #  4. The for-loop is in a reverse order, so the varable
-                #   `step` is started from `num_steps - 1`
-                #  5. Check the notebook for more information.
-
-                # self.returns[step] = None
                 delta = self.rewards[step] + gamma * self.value_preds[step +
                                                                       1] * self.masks[step] - self.value_preds[step]
                 gae = delta + gamma * self.gae_lambda * gae
