@@ -220,10 +220,14 @@ def train(args):
                     cpu_actions = enlarge_shape(cpu_actions, act_dim)
 
                     # obs, done, info not needed, we have masks & obs in frame_stack_tensors
-                    _, reward, _, _, masks, total_episodes, total_steps, episode_rewards[ind] = \
+                    _, reward, _, _, masks, new_total_episodes, new_total_steps, episode_rewards[ind] = \
                         step_envs(cpu_actions, envs[ind], episode_rewards[ind], frame_stack_tensors[ind],
                                   reward_recorders[ind], episode_length_recorders[ind],
                                   total_steps, total_episodes, config.device)
+
+                    if ind == 0:
+                        total_episodes = new_total_episodes
+                        total_steps = new_total_steps
 
                     rewards = torch.from_numpy(
                         reward.astype(np.float32)).view(-1, 1).to(config.device)
