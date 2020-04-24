@@ -20,7 +20,7 @@ import numpy as np
 import torch
 import json
 from env import make_envs
-
+from torch import nn
 from core.ppo_trainer_mtmt import PPOTrainerMTMT, ppo_config
 from core.utils import verify_log_dir, pretty_print, Timer, evaluate, \
     summary, save_progress, FrameStackTensor, step_envs, reduce_shape, enlarge_shape
@@ -147,7 +147,7 @@ def train(args):
     aux_act_dim = 6
 
     obs_dims = [main_reduce_obs_dim, aux_obs_dim]
-    act_dims = [main_reduce_act_dim, aux_act_dim]
+    act_dims = [main_act_dim, aux_act_dim]
 
     dim_dict = dict(obs_a=main_reduce_obs_dim, act_a=main_reduce_act_dim,
                     obs_b=aux_obs_dim, act_b=aux_act_dim, coeff_a=0.4, coeff_b=1)
