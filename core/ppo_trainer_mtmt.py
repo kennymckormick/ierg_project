@@ -13,7 +13,7 @@ import torch
 import torch.optim as optim
 from torch import nn
 
-from .base_trainer_mt import BaseTrainerMT
+from .base_trainer_mtmt import BaseTrainerMTMT
 from .buffer import PPORolloutStorage
 
 
