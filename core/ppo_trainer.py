@@ -47,6 +47,7 @@ class PPOConfig:
         self.activation = nn.Tanh
         self.output_activation = nn.Identity
         self.pretrain_pth = None
+        self.std_init_offset = 0
 
 
 ppo_config = PPOConfig()

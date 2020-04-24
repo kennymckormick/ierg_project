@@ -80,11 +80,11 @@ class mtmtmlp(nn.Module):
 
 class MLPGaussianActor(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation=nn.Tanh,
-                 output_activation=nn.Identity, act_coeff=1.0):
+                 output_activation=nn.Identity, act_coeff=1.0, std_init_offset=0):
         super(MLPGaussianActor, self).__init__()
         self.act_coeff = act_coeff
-        log_std = -0.5 * np.ones(act_dim, dtype=np.float32) - \
-            np.log(self.act_coeff)
+        log_std = -0.5 * np.ones(act_dim, dtype=np.float32) + \
+            np.log(self.act_coeff) + std_init_offset
         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.mu_net = mlp([obs_dim] + list(hidden_sizes) +
                           [act_dim], activation, output_activation)
@@ -111,11 +111,11 @@ class MTMLPGaussianActor(nn.Module):
         super(MTMLPGaussianActor, self).__init__()
         self.act_coeff = act_coeff
         log_std_a = -0.5 * \
-            np.ones(act_dim, dtype=np.float32) - np.log(self.act_coeff)
+            np.ones(act_dim, dtype=np.float32) + np.log(self.act_coeff)
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
         log_std_b = -0.5 * \
-            np.ones(act_dim, dtype=np.float32) - np.log(self.act_coeff)
+            np.ones(act_dim, dtype=np.float32) + np.log(self.act_coeff)
         self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
 
         self.mu_net = mtmlp([obs_dim] + list(hidden_sizes) +
@@ -145,11 +145,11 @@ class MTMTMLPGaussianActor(nn.Module):
         super(MTMTMLPGaussianActor, self).__init__()
         self.act_coeff = {'a': act_coeff[0], 'b': act_coeff[1]}
         log_std_a = -0.5 * \
-            np.ones(act_dim[0], dtype=np.float32) - np.log(self.act_coeff['a'])
+            np.ones(act_dim[0], dtype=np.float32) + np.log(self.act_coeff['a'])
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
         log_std_b = -0.5 * \
-            np.ones(act_dim[1], dtype=np.float32) - np.log(self.act_coeff['b'])
+            np.ones(act_dim[1], dtype=np.float32) + np.log(self.act_coeff['b'])
         self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
 
         self.mu_net = mtmtmlp(obs_dim, act_dim, hidden_sizes,
@@ -206,11 +206,11 @@ class MLPActorCritic(nn.Module):
 
     def __init__(self, obs_dim, act_dim, hidden_sizes=(64, 64),
                  activation=nn.Tanh, output_activation=nn.Identity,
-                 act_coeff=1.0, pretrain_pth=None):
+                 act_coeff=1.0, pretrain_pth=None, std_init_offset=0):
         super().__init__()
         # policy builder depends on action space
         self.pi = MLPGaussianActor(
-            obs_dim, act_dim, hidden_sizes, activation, output_activation, act_coeff)
+            obs_dim, act_dim, hidden_sizes, activation, output_activation, act_coeff, std_init_offset)
 
         self.v = MLPCritic(obs_dim, hidden_sizes, activation)
         if pretrain_pth is not None:

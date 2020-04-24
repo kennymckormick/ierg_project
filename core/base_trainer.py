@@ -56,7 +56,7 @@ class BaseTrainer:
         self.model = MLPActorCritic(
             config.real_obs_dim, config.real_act_dim, hidden_sizes=config.hidden_sizes,
             activation=config.activation, output_activation=config.output_activation,
-            act_coeff=config.act_coeff, pretrain_pth=config.pretrain_pth)
+            act_coeff=config.act_coeff, pretrain_pth=config.pretrain_pth, std_init_offset=config.std_init_offset)
 
         self.model = self.model.to(self.device)
         self.model.train()
