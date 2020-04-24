@@ -1,13 +1,3 @@
-"""
-This file implement neural network for you.
-
-Nothing you need to do in this file.
-
------
-2019-2020 2nd term, IERG 6130: Reinforcement Learning and Beyond. Department
-of Information Engineering, The Chinese University of Hong Kong. Course
-Instructor: Professor ZHOU Bolei. Assignment author: PENG Zhenghao.
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -93,7 +83,8 @@ class MLPGaussianActor(nn.Module):
                  output_activation=nn.Identity, act_coeff=1.0):
         super(MLPGaussianActor, self).__init__()
         self.act_coeff = act_coeff
-        log_std = -0.5 * np.ones(act_dim, dtype=np.float32) * self.act_coeff
+        log_std = -0.5 * np.ones(act_dim, dtype=np.float32) - \
+            np.log(self.act_coeff)
         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
         self.mu_net = mlp([obs_dim] + list(hidden_sizes) +
                           [act_dim], activation, output_activation)
@@ -119,10 +110,12 @@ class MTMLPGaussianActor(nn.Module):
                  output_activation=nn.Identity, act_coeff=1.0):
         super(MTMLPGaussianActor, self).__init__()
         self.act_coeff = act_coeff
-        log_std_a = -0.5 * np.ones(act_dim, dtype=np.float32) * self.act_coeff
+        log_std_a = -0.5 * \
+            np.ones(act_dim, dtype=np.float32) - np.log(self.act_coeff)
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
-        log_std_b = -0.5 * np.ones(act_dim, dtype=np.float32) * self.act_coeff
+        log_std_b = -0.5 * \
+            np.ones(act_dim, dtype=np.float32) - np.log(self.act_coeff)
         self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
 
         self.mu_net = mtmlp([obs_dim] + list(hidden_sizes) +
@@ -152,11 +145,11 @@ class MTMTMLPGaussianActor(nn.Module):
         super(MTMTMLPGaussianActor, self).__init__()
         self.act_coeff = {'a': act_coeff[0], 'b': act_coeff[1]}
         log_std_a = -0.5 * \
-            np.ones(act_dim[0], dtype=np.float32) * self.act_coeff['a']
+            np.ones(act_dim[0], dtype=np.float32) - np.log(self.act_coeff['a'])
         self.log_std_a = torch.nn.Parameter(torch.as_tensor(log_std_a))
 
         log_std_b = -0.5 * \
-            np.ones(act_dim[1], dtype=np.float32) * self.act_coeff['b']
+            np.ones(act_dim[1], dtype=np.float32) - np.log(self.act_coeff['b'])
         self.log_std_b = torch.nn.Parameter(torch.as_tensor(log_std_b))
 
         self.mu_net = mtmtmlp(obs_dim, act_dim, hidden_sizes,
