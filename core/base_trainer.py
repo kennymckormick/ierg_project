@@ -1,8 +1,5 @@
 """
 This file implement a base trainer class for both A2C and PPO trainers.
-
-You should finish `evaluate_actions` and `compute_action`
-
 -----
 2019-2020 2nd term, IERG 6130: Reinforcement Learning and Beyond. Department
 of Information Engineering, The Chinese University of Hong Kong. Course
@@ -20,6 +17,18 @@ from .network import MLPActorCritic
 class BaseTrainer:
     def __init__(self, env, config, myconfig={}):
 
+        act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
+                     'Tanh': nn.Tanh, 'Identity': nn.Identity}
+        if 'activation' in myconfig:
+            config.activation = act_funcs[myconfig['activation']]
+            myconfig.pop('activation')
+        if 'output_activation' in myconfig:
+            config.output_activation = act_funcs[myconfig['output_activation']]
+            myconfig.pop('output_activation')
+        # can be real_obs_dim, real_act_dim, pretrain_pth, etc.
+        for k, v in myconfig.items():
+            setattr(config, k, v)
+
         self.device = config.device
         self.config = config
         self.lr = config.LR
@@ -34,20 +43,10 @@ class BaseTrainer:
         self.act_high = env.action_space.high
         self.act_low = env.action_space.low
         # should be in config
-        config.real_obs_dim = self.obs_dim
-        config.real_act_dim = self.act_dim
-
-        act_funcs = {'Sigmoid': nn.Sigmoid, 'ReLU': nn.ReLU,
-                     'Tanh': nn.Tanh, 'Identity': nn.Identity}
-        if 'activation' in myconfig:
-            config.activation = act_funcs[myconfig['activation']]
-            myconfig.pop('activation')
-        if 'output_activation' in myconfig:
-            config.output_activation = act_funcs[myconfig['output_activation']]
-            myconfig.pop('output_activation')
-        # can be real_obs_dim, real_act_dim, pretrain_pth, etc.
-        for k, v in myconfig.items():
-            setattr(config, k, v)
+        if not hasattr(config, 'real_obs_dim'):
+            config.real_obs_dim = self.obs_dim
+        if not hasattr(config, 'real_act_dim'):
+            config.real_act_dim = self.act_dim
 
         assert sum(self.act_high == self.act_high[0]) == self.act_dim
         assert sum(self.act_low == self.act_low[0]) == self.act_dim
@@ -76,17 +75,6 @@ class BaseTrainer:
 
     def update(self, rollout):
         raise NotImplementedError()
-
-    def compute_action(self, obs, deterministic=False):
-        if isinstance(obs, np.ndarray):
-            obs = torch.from_numpy(obs).to(self.device)
-
-        values, actions, action_log_probs = self.model.step(
-            obs, eval=False, deterministic=deterministic)
-
-        # action is n_dim, should not be squeezed
-        return values.view(-1, 1), actions, action_log_probs.view(
-            -1, 1)
 
     def evaluate_actions(self, obs, act):
         """Run models to get the values, log probability of the action in
