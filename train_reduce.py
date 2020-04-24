@@ -156,6 +156,7 @@ def train(args):
     dim_dict = dict(obs_a=obs_dim, act_a=act_dim, obs_b=46,
                     act_b=11, coeff_a=0.4, coeff_b=0.4)
     dim_dict['act_dim'] = act_dim
+    dim_dict['real_obs_dim'] = obs_dim
 
     # Setup trainer
     if algo == "PPO":
