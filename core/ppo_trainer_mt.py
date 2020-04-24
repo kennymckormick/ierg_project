@@ -58,8 +58,6 @@ class PPOTrainerMT(BaseTrainerMT):
 
         self.num_sgd_steps = config.ppo_epoch
         self.mini_batch_size = config.mini_batch_size
-        self.num_mini_batches = int(
-            self.num_steps // self.mini_batch_size)
         self.clip_param = config.ppo_clip_param
 
     def setup_optimizer(self):

@@ -213,7 +213,9 @@ def train(args):
                 for index in range(config.num_steps):
                     trainer.model.eval()
                     values, actions, action_log_prob = trainer.model.step(
-                        reduce_shape(frame_stack_tensors[ind].get(), real_obs_dim), branch_names[ind])
+                        reduce_shape(
+                            frame_stack_tensors[ind].get(), real_obs_dim),
+                        deterministic=False, branch=branch_names[ind])
                     cpu_actions = actions.cpu().numpy()
                     cpu_actions = enlarge_shape(cpu_actions, act_dim)
 
